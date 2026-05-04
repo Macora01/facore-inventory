@@ -1,32 +1,46 @@
 version: '3.8'
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
-      - DATABASE_URL=postgres://facore:facore@db:5432/facore
-      - JWT_SECRET=${JWT_SECRET:-dev-secret}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-facore}:${POSTGRES_PASSWORD:-facore}@db:5432/${POSTGRES_DB:-facore}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - NODE_ENV=production
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://inv.facore.cl}
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - facore
 
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: facore
-      POSTGRES_PASSWORD: facore
-      POSTGRES_DB: facore
+      POSTGRES_USER: ${POSTGRES_USER:-facore}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-facore}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U facore"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-facore}"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - facore
 
 volumes:
   pgdata:
+
+networks:
+  facore:
+    driver: bridge
