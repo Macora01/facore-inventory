@@ -33,6 +33,9 @@ async function startServer() {
 
   const app = express();
 
+  // ── Confiar en proxy (Coolify/Nginx termina SSL) ──
+  app.set('trust proxy', 1);
+
   // ── Seguridad ──
   applySecurityMiddleware(app);
 
