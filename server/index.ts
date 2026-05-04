@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { initDb, getPool } from './config/database.js';
 import { applySecurityMiddleware } from './middleware/security.js';
 import { authenticateToken } from './middleware/auth.js';
+import { globalErrorHandler } from './middleware/errorHandler.js';
 
 import authRoutes from './routes/auth.js';
 import productRoutes from './routes/products.js';
@@ -72,6 +73,9 @@ async function startServer() {
   app.use('/api/reports', authenticateToken, reportRoutes);
   app.use('/api/upload', authenticateToken, uploadRoutes);
   app.use('/api/settings', authenticateToken, settingsRoutes);
+
+  // ── Error handler global (debe ir después de las rutas) ──
+  app.use(globalErrorHandler);
 
   // ── Frontend ──
   if (process.env.NODE_ENV !== 'production') {
