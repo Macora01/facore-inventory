@@ -28,12 +28,30 @@ const UploadPage: React.FC = () => {
   const { addToast } = useToast();
   const [type, setType] = useState<UploadType>('products');
   const [csv, setCsv] = useState('');
+  const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') {
+      setXlsxFile(file);
+      setCsv('');
+    } else {
+      // Leer como texto (CSV)
+      const reader = new FileReader();
+      reader.onload = (ev) => setCsv(ev.target?.result as string || '');
+      reader.readAsText(file);
+      setXlsxFile(null);
+    }
+  };
+
   const handleUpload = async () => {
-    if (!csv.trim()) {
-      addToast('Pega el contenido CSV primero', 'error');
+    if (!csv.trim() && !xlsxFile) {
+      addToast('Pega contenido CSV o selecciona un archivo', 'error');
       return;
     }
 
@@ -41,26 +59,28 @@ const UploadPage: React.FC = () => {
     setResult(null);
 
     try {
+      let body: any;
+      if (xlsxFile) {
+        // Convertir XLSX a base64
+        const buf = await xlsxFile.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+        body = JSON.stringify({ xlsx: base64 });
+      } else {
+        body = JSON.stringify({ csv });
+      }
+
       const res = await fetch(`/api/upload/${type}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ csv }),
+        body,
       });
       const data = await res.json();
       setResult(data);
-
-      if (res.ok) {
-        const count = data.count || data.created || 0;
-        addToast(`${count} registros procesados`, 'success');
-      } else {
-        addToast(data.error || 'Error al procesar', 'error');
-      }
-    } catch {
-      addToast('Error de conexión', 'error');
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) addToast(`${data.count || data.created || 0} registros`, 'success');
+      else addToast(data.error || 'Error', 'error');
+    } catch { addToast('Error de conexión', 'error'); }
+    finally { setLoading(false); }
   };
 
   const info = TYPE_LABELS[type];
@@ -68,7 +88,7 @@ const UploadPage: React.FC = () => {
   return (
     <div className="page-container animate-fade-in">
       <h2 className="page-title">Carga Masiva</h2>
-      <p className="page-subtitle">Importa productos, transferencias y ventas desde archivos CSV</p>
+      <p className="page-subtitle">Importa productos, transferencias y ventas desde CSV o XLSX</p>
 
       {/* Selector de tipo */}
       <div className="flex gap-2 flex-wrap">
@@ -96,13 +116,24 @@ const UploadPage: React.FC = () => {
 
         <div>
           <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
-            Contenido CSV
+            Archivo (XLSX o CSV)
+          </label>
+          <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileChange}
+            className="border-0 p-0 text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
+                       file:text-sm file:font-medium file:bg-clay file:text-white hover:file:bg-clay-dark
+                       file:cursor-pointer file:transition-colors" />
+          {xlsxFile && <p className="text-xs text-sage mt-1">✓ {xlsxFile.name}</p>}
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+            O pega el contenido CSV
           </label>
           <textarea
             value={csv}
             onChange={e => setCsv(e.target.value)}
             rows={10}
-            placeholder="Pega aquí el contenido de tu archivo CSV..."
+            placeholder="id_venta;descripcion;price;cost..."
             className="font-mono text-xs"
           />
         </div>
@@ -110,7 +141,7 @@ const UploadPage: React.FC = () => {
         <div className="mt-4 flex gap-3 items-center">
           <Button variant="primary" loading={loading} onClick={handleUpload}>
             <Upload size={14} className="mr-1" />
-            Procesar {info.label}
+            Procesar archivo
           </Button>
         </div>
 

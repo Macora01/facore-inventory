@@ -33,16 +33,18 @@ export enum LocationType {
   WAREHOUSE = 'WAREHOUSE',
   FIXED_STORE_PERMANENT = 'FIXED_STORE_PERMANENT',
   FIXED_STORE_TEMPORARY = 'FIXED_STORE_TEMPORARY',
-  MOBILE_STORE = 'MOBILE_STORE',
+  INDIRECT_STORE = 'INDIRECT_STORE',
   ONLINE_STORE = 'ONLINE_STORE',
+  HOME_STORE = 'HOME_STORE',
 }
 
 export const LOCATION_TYPE_LABEL: Record<LocationType, string> = {
   [LocationType.WAREHOUSE]: 'Bodega',
-  [LocationType.FIXED_STORE_PERMANENT]: 'Tienda Fija',
-  [LocationType.FIXED_STORE_TEMPORARY]: 'Tienda Temporal',
-  [LocationType.MOBILE_STORE]: 'Feria / Móvil',
-  [LocationType.ONLINE_STORE]: 'Online',
+  [LocationType.FIXED_STORE_PERMANENT]: 'Almacén Fijo',
+  [LocationType.FIXED_STORE_TEMPORARY]: 'Almacén Temporal',
+  [LocationType.INDIRECT_STORE]: 'Almacén Indirecto',
+  [LocationType.ONLINE_STORE]: 'Almacén Web',
+  [LocationType.HOME_STORE]: 'Almacén Casa',
 };
 
 export interface Location {

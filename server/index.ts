@@ -20,6 +20,7 @@ import locationRoutes from './routes/locations.js';
 import reportRoutes from './routes/reports.js';
 import uploadRoutes from './routes/upload.js';
 import settingsRoutes from './routes/settings.js';
+import seedRoutes from './routes/seed.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,6 +77,7 @@ async function startServer() {
   app.use('/api/reports', authenticateToken, reportRoutes);
   app.use('/api/upload', authenticateToken, uploadRoutes);
   app.use('/api/settings', authenticateToken, settingsRoutes);
+  app.use('/api/seed', authenticateToken, seedRoutes);
 
   // ── Error handler global (debe ir después de las rutas) ──
   app.use(globalErrorHandler);
