@@ -6,6 +6,9 @@ import Sidebar from './components/Sidebar';
 import LoginPage from './pages/LoginPage';
 import SalesPage from './pages/SalesPage';
 import ApprovalsPage from './pages/ApprovalsPage';
+import InventoryPage from './pages/InventoryPage';
+import MovementsPage from './pages/MovementsPage';
+import SettingsPage from './pages/SettingsPage';
 import { motion, AnimatePresence } from 'motion/react';
 
 const AppContent: React.FC = () => {
@@ -31,14 +34,14 @@ const AppContent: React.FC = () => {
 
   const renderPage = () => {
     switch (currentHash) {
-      case '#/inventory': return <PlaceholderPage title="Catálogo" />;
+      case '#/inventory': return <InventoryPage />;
       case '#/sales': return <SalesPage />;
       case '#/approvals': return <ApprovalsPage />;
       case '#/purchases': return <PlaceholderPage title="Compras" />;
-      case '#/movements': return <PlaceholderPage title="Movimientos" />;
+      case '#/movements': return <MovementsPage />;
       case '#/traceability': return <PlaceholderPage title="Trazabilidad" />;
       case '#/reports': return <PlaceholderPage title="Reportes" />;
-      case '#/settings': return <PlaceholderPage title="Configuración" />;
+      case '#/settings': return <SettingsPage />;
       default: return <PlaceholderPage title="Dashboard" />;
     }
   };
