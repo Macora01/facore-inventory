@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useHashNavigation } from '../hooks/useHashNavigation';
 import {
   LayoutDashboard, Package, ShoppingCart, ClipboardCheck,
-  Truck, ArrowLeftRight, Search, FileText, Settings, LogOut, ChevronLeft
+  Truck, ArrowLeftRight, Search, FileText, Settings, LogOut, Menu, X
 } from 'lucide-react';
 import { APP_NAME } from '../version';
 
@@ -29,6 +29,32 @@ const NAV_ITEMS: NavItem[] = [
 const Sidebar: React.FC = () => {
   const { currentUser, logout } = useApp();
   const { currentHash, navigateTo } = useHashNavigation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Cerrar sidebar al navegar en móvil
+  const handleNav = (hash: string) => {
+    navigateTo(hash);
+    setMobileOpen(false);
+  };
+
+  // Cerrar sidebar al hacer clic fuera
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.sidebar-panel') && !target.closest('.sidebar-toggle')) {
+        setMobileOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [mobileOpen]);
+
+  // Bloquear scroll cuando sidebar móvil está abierto
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
 
   const visibleItems = NAV_ITEMS.filter(
     item => currentUser && item.roles.includes(currentUser.role)
@@ -39,16 +65,16 @@ const Sidebar: React.FC = () => {
     return currentHash === hash;
   };
 
-  return (
-    <aside className="w-56 min-h-screen bg-sidebar flex flex-col shrink-0">
+  const sidebarContent = (
+    <>
       {/* Header */}
       <div className="p-5 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-clay/20 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-clay/20 flex items-center justify-center shrink-0">
             <span className="text-clay-light text-sm font-semibold">F</span>
           </div>
-          <div>
-            <p className="text-white text-sm font-semibold tracking-tight">{APP_NAME}</p>
+          <div className="min-w-0">
+            <p className="text-white text-sm font-semibold tracking-tight truncate">{APP_NAME}</p>
             <p className="text-white/30 text-[10px] font-medium uppercase tracking-wider">
               {currentUser?.role === 'admin' ? 'Admin' : 'Vendedora'}
             </p>
@@ -61,15 +87,15 @@ const Sidebar: React.FC = () => {
         {visibleItems.map(item => (
           <button
             key={item.hash}
-            onClick={() => navigateTo(item.hash)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+            onClick={() => handleNav(item.hash)}
+            className={`sidebar-nav-item w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm
                        transition-all duration-150 group
                        ${isActive(item.hash)
                          ? 'bg-sidebar-active text-white font-medium'
                          : 'text-white/50 hover:text-white/80 hover:bg-sidebar-hover'
                        }`}
           >
-            <item.icon size={18} />
+            <item.icon size={20} />
             <span>{item.label}</span>
           </button>
         ))}
@@ -85,15 +111,57 @@ const Sidebar: React.FC = () => {
           </div>
           <button
             onClick={logout}
-            className="p-2 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5
+            className="sidebar-logout p-2.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5
                        transition-all duration-150"
             title="Cerrar sesión"
           >
-            <LogOut size={16} />
+            <LogOut size={18} />
           </button>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger */}
+      <button
+        className="sidebar-toggle lg:hidden fixed top-3 left-3 z-30 p-2.5 rounded-lg
+                   bg-sidebar text-white shadow-lg"
+        onClick={() => setMobileOpen(!mobileOpen)}
+        aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+      >
+        {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+      </button>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 bg-black/50 z-40 transition-opacity" />
+      )}
+
+      {/* Desktop sidebar (siempre visible) */}
+      <aside className="hidden lg:flex w-56 min-h-screen bg-sidebar flex-col shrink-0">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile sidebar (overlay) */}
+      <aside
+        className={`sidebar-panel lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col
+                   transform transition-transform duration-250 ease-out
+                   ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        {/* Close button en panel */}
+        <div className="absolute top-3 right-3">
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="p-2 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/5"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        {sidebarContent}
+      </aside>
+    </>
   );
 };
 

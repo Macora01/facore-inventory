@@ -161,3 +161,64 @@ table.facore-table tbody tr:hover {
 /* ── Toast ── */
 .toast-enter { animation: slideUp 0.3s ease-out; }
 .toast-exit { opacity: 0; transform: translateY(-8px); transition: all 0.2s ease-in; }
+
+/* ── Mobile-First ── */
+/* Touch targets: mínimo 44x44px (Apple HIG) */
+@media (max-width: 1023px) {
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="number"],
+  input[type="date"],
+  input[type="search"],
+  select,
+  textarea {
+    @apply py-3 text-base;
+    min-height: 44px;
+  }
+
+  /* Botones más grandes en móvil */
+  button[type="submit"],
+  .btn-touch {
+    min-height: 48px;
+    @apply text-base;
+  }
+
+  /* Espaciado generoso para contenido mobile */
+  .page-container {
+    @apply space-y-4;
+  }
+
+  .page-title {
+    @apply text-xl;
+  }
+
+  /* Cards full-width en móvil */
+  .card-mobile-full {
+    @apply -mx-4 rounded-none border-x-0;
+  }
+}
+
+/* Sidebar nav items — touch-friendly height */
+.sidebar-nav-item {
+  min-height: 44px;
+}
+
+.sidebar-logout {
+  min-height: 40px;
+  min-width: 40px;
+}
+
+/* Transición sidebar mobile */
+@media (max-width: 1023px) {
+  .duration-250 {
+    transition-duration: 250ms;
+  }
+}
+
+/* Evitar zoom en inputs en iOS */
+@media screen and (max-width: 1023px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}

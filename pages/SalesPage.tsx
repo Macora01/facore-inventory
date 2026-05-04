@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../hooks/useToast';
 import Button from '../components/Button';
 import Card from '../components/Card';
+import { Scan, X } from 'lucide-react';
+
+// html5-qrcode se carga dinámicamente (evita errores SSR y reduce bundle inicial)
 
 const SalesPage: React.FC = () => {
   const { products, stock, locations, currentUser, pendingSales, fetchData, createEntity } = useApp();
@@ -13,6 +16,12 @@ const SalesPage: React.FC = () => {
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+
+  // Scanner
+  const [scanning, setScanning] = useState(false);
+  const [scannerReady, setScannerReady] = useState(false);
+  const scannerRef = useRef<HTMLDivElement>(null);
+  const scannerInstance = useRef<any>(null);
 
   // Cargar datos al montar
   useEffect(() => {
@@ -28,12 +37,79 @@ const SalesPage: React.FC = () => {
     if (product) setPrice(product.price);
   }, [selectedProduct, products]);
 
-  // Filtrar ubicaciones — admin ve todas, vendedora solo la suya
+  // Limpiar scanner al desmontar
+  useEffect(() => {
+    return () => {
+      if (scannerInstance.current) {
+        scannerInstance.current.stop().catch(() => {});
+      }
+    };
+  }, []);
+
+  // ── Escáner QR ──
+  const startScanner = async () => {
+    setScanning(true);
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      
+      // Pequeño delay para que el DOM se renderice
+      await new Promise(r => setTimeout(r, 200));
+
+      const scanner = new Html5Qrcode('qr-reader');
+      scannerInstance.current = scanner;
+
+      await scanner.start(
+        { facingMode: 'user' }, // cámara frontal
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1,
+        },
+        (decodedText: string) => {
+          // Producto escaneado
+          const match = products.find(
+            p => p.id_venta === decodedText || p.id_fabrica === decodedText
+          );
+          if (match) {
+            setSelectedProduct(match.id_venta);
+            addToast(`Producto encontrado: ${match.id_venta}`, 'success');
+            stopScanner();
+          } else {
+            addToast(`Código no reconocido: ${decodedText}`, 'error');
+            // Vibrar en móvil si está disponible
+            if (navigator.vibrate) navigator.vibrate(200);
+          }
+        },
+        () => {} // error de scan individual, ignorar
+      );
+      setScannerReady(true);
+    } catch (err: any) {
+      console.error('Scanner error:', err);
+      if (err.message?.includes('permission')) {
+        addToast('Permiso de cámara denegado. Actívalo en configuración.', 'error');
+      } else {
+        addToast('No se pudo iniciar la cámara', 'error');
+      }
+      setScanning(false);
+    }
+  };
+
+  const stopScanner = async () => {
+    if (scannerInstance.current) {
+      try {
+        await scannerInstance.current.stop();
+      } catch {}
+      scannerInstance.current = null;
+    }
+    setScanning(false);
+    setScannerReady(false);
+  };
+
+  // ── Resto de la lógica ──
   const myLocations = currentUser?.role === 'admin'
     ? locations.filter(l => l.isActive !== false)
     : locations.filter(l => l.id === currentUser?.locationId);
 
-  // Stock disponible en ubicación seleccionada
   const availableStock = stock.find(
     s => s.productId === selectedProduct && s.locationId === selectedLocation
   );
@@ -78,7 +154,6 @@ const SalesPage: React.FC = () => {
     }
   };
 
-  // Mis ventas recientes (pendientes + últimas procesadas)
   const mySales = pendingSales
     .filter(s => s.sellerUsername === currentUser?.username)
     .slice(0, 10);
@@ -101,22 +176,60 @@ const SalesPage: React.FC = () => {
 
       <Card padding="lg">
         <form onSubmit={handleSubmit} className="space-y-5 max-w-lg">
-          {/* Producto */}
+          {/* Producto + Scanner */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">Producto</label>
-            <select
-              value={selectedProduct}
-              onChange={e => setSelectedProduct(e.target.value)}
-              required
-            >
-              <option value="">Seleccionar producto...</option>
-              {products.map(p => (
-                <option key={p.id_venta} value={p.id_venta}>
-                  {p.id_venta} — {p.description} (${p.price.toLocaleString('es-CL')})
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={selectedProduct}
+                onChange={e => setSelectedProduct(e.target.value)}
+                className="flex-1"
+                required
+              >
+                <option value="">Seleccionar producto...</option>
+                {products.map(p => (
+                  <option key={p.id_venta} value={p.id_venta}>
+                    {p.id_venta} — {p.description} (${p.price.toLocaleString('es-CL')})
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={scanning ? stopScanner : startScanner}
+                title="Escanear código QR"
+              >
+                <Scan size={18} />
+              </Button>
+            </div>
           </div>
+
+          {/* Scanner QR */}
+          {scanning && (
+            <div className="relative bg-black rounded-lg overflow-hidden" style={{ minHeight: 300 }}>
+              <div id="qr-reader" ref={scannerRef} className="w-full" />
+              {!scannerReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                  <div className="text-center text-white">
+                    <div className="w-10 h-10 mx-auto border-2 border-white/30 border-t-white rounded-full animate-spin mb-3" />
+                    <p className="text-sm opacity-70">Iniciando cámara frontal...</p>
+                  </div>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={stopScanner}
+                className="absolute top-3 right-3 z-10 p-2 bg-black/50 text-white rounded-full
+                           hover:bg-black/70 transition-colors"
+              >
+                <X size={20} />
+              </button>
+              <p className="absolute bottom-3 left-0 right-0 text-center text-white/60 text-xs">
+                Apunta al código QR del producto
+              </p>
+            </div>
+          )}
 
           {/* Ubicación */}
           <div>
@@ -183,7 +296,7 @@ const SalesPage: React.FC = () => {
       </Card>
 
       {/* Mis ventas recientes */}
-      <Card title={`Mis ventas recientes`} padding="none">
+      <Card title="Mis ventas recientes" padding="none">
         {mySales.length === 0 ? (
           <div className="p-5 text-center text-sm text-text-muted">
             No tienes ventas registradas aún
