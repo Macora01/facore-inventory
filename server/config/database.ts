@@ -38,6 +38,15 @@ export async function initDb(): Promise<boolean> {
       console.log('PostgreSQL conectado. Creando tablas...');
 
       await client.query(`
+        CREATE TABLE IF NOT EXISTS locations (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'FIXED_STORE_PERMANENT',
+          address TEXT,
+          is_active BOOLEAN DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY,
           username TEXT UNIQUE NOT NULL,
@@ -58,15 +67,6 @@ export async function initDb(): Promise<boolean> {
           image TEXT,
           category TEXT,
           supplier_id TEXT,
-          created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS locations (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          type TEXT NOT NULL DEFAULT 'FIXED_STORE_PERMANENT',
-          address TEXT,
-          is_active BOOLEAN DEFAULT true,
           created_at TIMESTAMPTZ DEFAULT NOW()
         );
 
