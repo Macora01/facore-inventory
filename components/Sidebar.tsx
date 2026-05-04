@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useHashNavigation } from '../hooks/useHashNavigation';
 import {
@@ -32,30 +32,10 @@ const Sidebar: React.FC = () => {
   const { currentHash, navigateTo } = useHashNavigation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Cerrar sidebar al navegar en móvil
   const handleNav = (hash: string) => {
     navigateTo(hash);
     setMobileOpen(false);
   };
-
-  // Cerrar sidebar al hacer clic fuera
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.sidebar-panel') && !target.closest('.sidebar-toggle')) {
-        setMobileOpen(false);
-      }
-    };
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, [mobileOpen]);
-
-  // Bloquear scroll cuando sidebar móvil está abierto
-  useEffect(() => {
-    document.body.style.overflow = mobileOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [mobileOpen]);
 
   const visibleItems = NAV_ITEMS.filter(
     item => currentUser && item.roles.includes(currentUser.role)
@@ -66,9 +46,13 @@ const Sidebar: React.FC = () => {
     return currentHash === hash;
   };
 
+  const roleLabel = 
+    currentUser?.role === 'admin' ? 'Admin' :
+    currentUser?.role === 'operador' ? 'Operador' :
+    currentUser?.role === 'visita' ? 'Visita' : 'Vendedora';
+
   const sidebarContent = (
     <>
-      {/* Header */}
       <div className="p-5 border-b border-white/5">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-clay/20 flex items-center justify-center shrink-0">
@@ -76,21 +60,18 @@ const Sidebar: React.FC = () => {
           </div>
           <div className="min-w-0">
             <p className="text-white text-sm font-semibold tracking-tight truncate">{APP_NAME}</p>
-            <p className="text-white/30 text-[10px] font-medium uppercase tracking-wider">
-              {currentUser?.role === 'admin' ? 'Admin' : currentUser?.role === 'operador' ? 'Operador' : currentUser?.role === 'visita' ? 'Visita' : 'Vendedora'}
-            </p>
+            <p className="text-white/30 text-[10px] font-medium uppercase tracking-wider">{roleLabel}</p>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
         {visibleItems.map(item => (
           <button
             key={item.hash}
             onClick={() => handleNav(item.hash)}
-            className={`sidebar-nav-item w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm
-                       transition-all duration-150 group
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm min-h-[44px]
+                       transition-all duration-150
                        ${isActive(item.hash)
                          ? 'bg-sidebar-active text-white font-medium'
                          : 'text-white/50 hover:text-white/80 hover:bg-sidebar-hover'
@@ -102,7 +83,6 @@ const Sidebar: React.FC = () => {
         ))}
       </nav>
 
-      {/* User & Logout */}
       <div className="p-3 border-t border-white/5">
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
@@ -112,8 +92,7 @@ const Sidebar: React.FC = () => {
           </div>
           <button
             onClick={logout}
-            className="sidebar-logout p-2.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5
-                       transition-all duration-150"
+            className="p-2.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 min-h-[40px] min-w-[40px]"
             title="Cerrar sesión"
           >
             <LogOut size={18} />
@@ -125,43 +104,32 @@ const Sidebar: React.FC = () => {
 
   return (
     <>
-      {/* Mobile hamburger */}
-      <button
-        className="sidebar-toggle lg:hidden fixed top-3 left-3 z-30 p-2.5 rounded-lg
-                   bg-sidebar text-white shadow-lg"
-        onClick={() => setMobileOpen(!mobileOpen)}
-        aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
-      >
-        {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-      </button>
-
-      {/* Mobile overlay */}
+      {/* Overlay móvil */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 bg-black/50 z-40 transition-opacity" />
+        <div 
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setMobileOpen(false)}
+        />
       )}
 
-      {/* Desktop sidebar (siempre visible) */}
-      <aside className="hidden lg:flex w-56 min-h-screen bg-sidebar flex-col shrink-0">
+      {/* Panel móvil */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col
+                      transform transition-transform duration-200
+                      lg:translate-x-0
+                      ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         {sidebarContent}
-      </aside>
+      </div>
 
-      {/* Mobile sidebar (overlay) */}
-      <aside
-        className={`sidebar-panel lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col
-                   transform transition-transform duration-250 ease-out
-                   ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      {/* Botón hamburger — solo móvil */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed top-3 left-3 z-30 w-11 h-11 flex items-center justify-center
+                   rounded-xl bg-sidebar text-white shadow-lg border border-white/10
+                   active:scale-95 transition-transform"
+        aria-label="Abrir menú"
       >
-        {/* Close button en panel */}
-        <div className="absolute top-3 right-3">
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="p-2 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/5"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        {sidebarContent}
-      </aside>
+        <Menu size={22} />
+      </button>
     </>
   );
 };

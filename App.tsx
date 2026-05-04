@@ -52,7 +52,7 @@ const AppContent: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-canvas">
       <Sidebar />
-      <main className="flex-1 p-4 pt-14 lg:p-8 lg:pt-8 h-screen overflow-y-auto">
+      <main className="flex-1 p-4 pt-16 lg:pl-72 lg:p-8 lg:pt-8 h-screen overflow-y-auto">
         <div className="max-w-7xl mx-auto">
           <AnimatePresence mode="wait">
             <motion.div
