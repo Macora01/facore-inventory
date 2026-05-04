@@ -117,7 +117,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         movements: setMovements,
         locations: setLocations,
         users: setUsers,
-        'purchase-orders': setPurchaseOrders,
+        'purchases': setPurchaseOrders,
         'sales/pending': setPendingSales,
       };
       if (setters[entity]) setters[entity](data);
@@ -134,7 +134,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fetchData('stock'),
       fetchData('movements'),
       fetchData('locations'),
-      fetchData('purchase-orders'),
+      fetchData('purchases'),
       fetchData('sales/pending'),
     ]);
   }

@@ -10,7 +10,7 @@ const PurchasesPage: React.FC = () => {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchData('purchase-orders');
+    fetchData('purchases');
   }, []);
 
   return (
