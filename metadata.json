@@ -1,0 +1,10 @@
+{
+  "name": "Facore Inventory",
+  "version": "2.0.0",
+  "description": "Sistema de gestión de inventario con trazabilidad completa, backoffice de compras, y ventas móviles con aprobación.",
+  "stack": "React 19 + TypeScript + Vite + Tailwind CSS 4 + Node.js + Express + PostgreSQL",
+  "repository": "https://github.com/Macora01/facore-inventory",
+  "domain": "inv.facore.cl",
+  "deployment": "Coolify on Hostinger VPS",
+  "author": "Mario (con Helfie — Hermes Agent)"
+}

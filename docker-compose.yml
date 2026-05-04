@@ -1,0 +1,32 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://facore:facore@db:5432/facore
+      - JWT_SECRET=${JWT_SECRET:-dev-secret}
+      - NODE_ENV=production
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: facore
+      POSTGRES_PASSWORD: facore
+      POSTGRES_DB: facore
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U facore"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:
