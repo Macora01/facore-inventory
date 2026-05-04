@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { LogIn, User, Lock, AlertCircle } from 'lucide-react';
+import { LogIn, AlertCircle } from 'lucide-react';
 import { APP_VERSION, APP_NAME } from '../version';
 
 const LoginPage: React.FC = () => {
@@ -52,22 +52,15 @@ const LoginPage: React.FC = () => {
               <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 Usuario
               </label>
-              <div className="relative">
-                <User 
-                  size={16} 
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" 
-                />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  required
-                  autoComplete="username"
-                  className="pl-10"
-                  placeholder="Ingresa tu usuario"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </div>
+              <input
+                ref={inputRef}
+                type="text"
+                required
+                autoComplete="username"
+                placeholder="Ingresa tu usuario"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
             </div>
 
             {/* Contraseña */}
@@ -75,21 +68,14 @@ const LoginPage: React.FC = () => {
               <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 Contraseña
               </label>
-              <div className="relative">
-                <Lock 
-                  size={16} 
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" 
-                />
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  className="pl-10"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
             </div>
 
             {/* Error */}
