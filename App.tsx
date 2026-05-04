@@ -7,7 +7,9 @@ import LoginPage from './pages/LoginPage';
 import SalesPage from './pages/SalesPage';
 import ApprovalsPage from './pages/ApprovalsPage';
 import InventoryPage from './pages/InventoryPage';
+import PurchasesPage from './pages/PurchasesPage';
 import MovementsPage from './pages/MovementsPage';
+import UploadPage from './pages/UploadPage';
 import SettingsPage from './pages/SettingsPage';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -37,10 +39,11 @@ const AppContent: React.FC = () => {
       case '#/inventory': return <InventoryPage />;
       case '#/sales': return <SalesPage />;
       case '#/approvals': return <ApprovalsPage />;
-      case '#/purchases': return <PlaceholderPage title="Compras" />;
+      case '#/purchases': return <PurchasesPage />;
       case '#/movements': return <MovementsPage />;
       case '#/traceability': return <PlaceholderPage title="Trazabilidad" />;
       case '#/reports': return <PlaceholderPage title="Reportes" />;
+      case '#/upload': return <UploadPage />;
       case '#/settings': return <SettingsPage />;
       default: return <PlaceholderPage title="Dashboard" />;
     }

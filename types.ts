@@ -3,7 +3,7 @@ export interface User {
   id: string;
   username: string;
   password?: string; // nunca se expone al frontend
-  role: 'admin' | 'vendedora';
+  role: 'admin' | 'operador' | 'vendedora' | 'visita';
   displayName?: string;
   locationId?: string;
 }

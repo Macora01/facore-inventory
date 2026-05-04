@@ -9,7 +9,7 @@ const router = Router();
 router.use(requireDb);
 
 // ── GET /api/products — Listar productos con búsqueda y stock ──
-router.get('/', requireRole('vendedora', 'admin'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/', requireRole('vendedora', 'admin', 'operador', 'visita'), asyncHandler(async (req: Request, res: Response) => {
   const pool = req.db!;
   const search = (req.query.search as string || '').trim();
   const lowStock = req.query.lowStock === 'true';
@@ -54,7 +54,7 @@ router.get('/', requireRole('vendedora', 'admin'), asyncHandler(async (req: Requ
 }));
 
 // ── GET /api/products/:id — Detalle con stock por ubicación ──
-router.get('/:id', requireRole('vendedora', 'admin'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/:id', requireRole('vendedora', 'admin', 'operador', 'visita'), asyncHandler(async (req: Request, res: Response) => {
   const pool = req.db!;
   const { id } = req.params;
 

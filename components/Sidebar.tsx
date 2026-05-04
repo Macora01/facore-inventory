@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useHashNavigation } from '../hooks/useHashNavigation';
 import {
   LayoutDashboard, Package, ShoppingCart, ClipboardCheck,
-  Truck, ArrowLeftRight, Search, FileText, Settings, LogOut, Menu, X
+  Truck, ArrowLeftRight, Search, FileText, Settings, LogOut, Menu, X, Upload
 } from 'lucide-react';
 import { APP_NAME } from '../version';
 
@@ -15,14 +15,15 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { hash: '#/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
-  { hash: '#/inventory', label: 'Catálogo', icon: Package, roles: ['admin'] },
-  { hash: '#/sales', label: 'Vender', icon: ShoppingCart, roles: ['admin', 'vendedora'] },
-  { hash: '#/approvals', label: 'Aprobaciones', icon: ClipboardCheck, roles: ['admin'] },
-  { hash: '#/purchases', label: 'Compras', icon: Truck, roles: ['admin'] },
-  { hash: '#/movements', label: 'Movimientos', icon: ArrowLeftRight, roles: ['admin'] },
-  { hash: '#/traceability', label: 'Trazabilidad', icon: Search, roles: ['admin'] },
-  { hash: '#/reports', label: 'Reportes', icon: FileText, roles: ['admin'] },
+  { hash: '#/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'operador', 'visita'] },
+  { hash: '#/inventory', label: 'Catálogo', icon: Package, roles: ['admin', 'operador', 'visita'] },
+  { hash: '#/sales', label: 'Vender', icon: ShoppingCart, roles: ['admin', 'operador', 'vendedora'] },
+  { hash: '#/approvals', label: 'Aprobaciones', icon: ClipboardCheck, roles: ['admin', 'operador'] },
+  { hash: '#/purchases', label: 'Compras', icon: Truck, roles: ['admin', 'operador'] },
+  { hash: '#/movements', label: 'Movimientos', icon: ArrowLeftRight, roles: ['admin', 'operador', 'visita'] },
+  { hash: '#/traceability', label: 'Trazabilidad', icon: Search, roles: ['admin', 'operador', 'visita'] },
+  { hash: '#/reports', label: 'Reportes', icon: FileText, roles: ['admin', 'operador', 'visita'] },
+  { hash: '#/upload', label: 'Carga Masiva', icon: Upload, roles: ['admin', 'operador'] },
   { hash: '#/settings', label: 'Configuración', icon: Settings, roles: ['admin'] },
 ];
 
@@ -76,7 +77,7 @@ const Sidebar: React.FC = () => {
           <div className="min-w-0">
             <p className="text-white text-sm font-semibold tracking-tight truncate">{APP_NAME}</p>
             <p className="text-white/30 text-[10px] font-medium uppercase tracking-wider">
-              {currentUser?.role === 'admin' ? 'Admin' : 'Vendedora'}
+              {currentUser?.role === 'admin' ? 'Admin' : currentUser?.role === 'operador' ? 'Operador' : currentUser?.role === 'visita' ? 'Visita' : 'Vendedora'}
             </p>
           </div>
         </div>

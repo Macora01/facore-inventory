@@ -12,7 +12,7 @@ router.use(authenticateToken);
 router.use(requireDb);
 
 // ── GET /api/sales — Historial de ventas ──
-router.get('/', requireRole('vendedora', 'admin'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/', requireRole('vendedora', 'admin', 'operador', 'visita'), asyncHandler(async (req: Request, res: Response) => {
   const pool = req.db!;
   const status = req.query.status as string | undefined;
 
@@ -46,7 +46,7 @@ router.get('/', requireRole('vendedora', 'admin'), asyncHandler(async (req: Requ
 }));
 
 // ── GET /api/sales/pending — Ventas pendientes ──
-router.get('/pending', requireRole('vendedora', 'admin'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/pending', requireRole('vendedora', 'admin', 'operador'), asyncHandler(async (req: Request, res: Response) => {
   const pool = req.db!;
 
   let query = `
@@ -70,7 +70,7 @@ router.get('/pending', requireRole('vendedora', 'admin'), asyncHandler(async (re
 }));
 
 // ── POST /api/sales — Registrar venta ──
-router.post('/', requireRole('vendedora', 'admin'), asyncHandler(async (req: Request, res: Response) => {
+router.post('/', requireRole('vendedora', 'admin', 'operador'), asyncHandler(async (req: Request, res: Response) => {
   const { productId, locationId, quantity, price } = req.body;
   const sellerUsername = req.user!.username;
 
@@ -122,7 +122,7 @@ router.post('/', requireRole('vendedora', 'admin'), asyncHandler(async (req: Req
 }));
 
 // ── POST /api/sales/:id/approve — Aprobar venta ──
-router.post('/:id/approve', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+router.post('/:id/approve', requireRole('admin', 'operador'), asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const pool = req.db!;
   const client = await pool.connect();
@@ -190,7 +190,7 @@ router.post('/:id/approve', requireRole('admin'), asyncHandler(async (req: Reque
 }));
 
 // ── POST /api/sales/:id/reject — Rechazar venta ──
-router.post('/:id/reject', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+router.post('/:id/reject', requireRole('admin', 'operador'), asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { notes } = req.body;
   const pool = req.db!;

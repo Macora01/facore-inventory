@@ -8,7 +8,7 @@ const router = Router();
 router.use(requireDb);
 
 // ── GET /api/movements — Historial de movimientos ──
-router.get('/', requireRole('vendedora', 'admin'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/', requireRole('vendedora', 'admin', 'operador', 'visita'), asyncHandler(async (req: Request, res: Response) => {
   const pool = req.db!;
   const type = req.query.type as string | undefined;
   const productId = req.query.productId as string | undefined;

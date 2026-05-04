@@ -8,7 +8,7 @@ const router = Router();
 router.use(requireDb);
 
 // ── GET /api/stock — Todo el stock ──
-router.get('/', requireRole('vendedora', 'admin'), asyncHandler(async (req: Request, res: Response) => {
+router.get('/', requireRole('vendedora', 'admin', 'operador', 'visita'), asyncHandler(async (req: Request, res: Response) => {
   const pool = req.db!;
   const locationId = req.query.locationId as string | undefined;
 
