@@ -2,13 +2,29 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import { Search, AlertTriangle, Download } from 'lucide-react';
+import { Search, AlertTriangle, Download, Plus, Trash2, Save } from 'lucide-react';
+import { useToast } from '../hooks/useToast';
 
 const InventoryPage: React.FC = () => {
   const { products, stock, locations, fetchData } = useApp();
+  const { addToast } = useToast();
   const [search, setSearch] = useState('');
   const [showLowStock, setShowLowStock] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+
+  // Form state
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    id_venta: '',
+    id_fabrica: '',
+    description: '',
+    price: '',
+    cost: '',
+    min_stock: '',
+    category: '',
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchData('products');
@@ -88,6 +104,96 @@ const InventoryPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // ── CRUD ──
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({ id_venta: '', id_fabrica: '', description: '', price: '', cost: '', min_stock: '', category: '' });
+    setShowForm(false);
+  };
+
+  const openNew = () => {
+    setEditingId(null);
+    setForm({ id_venta: '', id_fabrica: '', description: '', price: '', cost: '', min_stock: '', category: '' });
+    setShowForm(true);
+  };
+
+  const openEdit = (p: typeof products[0]) => {
+    setEditingId(p.id_venta);
+    setForm({
+      id_venta: p.id_venta,
+      id_fabrica: p.id_fabrica || '',
+      description: p.description,
+      price: String(p.price),
+      cost: String(p.cost),
+      min_stock: p.minStock != null ? String(p.minStock) : '',
+      category: p.category || '',
+    });
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.id_venta.trim() || !form.description.trim()) {
+      addToast('Código y descripción son obligatorios', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const body = {
+        id_venta: form.id_venta.trim(),
+        id_fabrica: form.id_fabrica.trim() || form.id_venta.trim(),
+        description: form.description.trim(),
+        price: Number(form.price) || 0,
+        cost: Number(form.cost) || 0,
+        min_stock: form.min_stock ? Number(form.min_stock) : null,
+        category: form.category.trim() || null,
+      };
+
+      if (editingId) {
+        // Editar
+        const res = await fetch(`/api/products/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error('Error al actualizar');
+        addToast('Producto actualizado', 'success');
+      } else {
+        // Crear
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error('Error al crear');
+        addToast('Producto creado', 'success');
+      }
+      resetForm();
+      fetchData('products');
+    } catch (err: any) {
+      addToast(err.message || 'Error al guardar', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm(`¿Eliminar el producto ${id}?`)) return;
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Error al eliminar');
+      addToast('Producto eliminado', 'success');
+      fetchData('products');
+      if (selectedProduct === id) setSelectedProduct(null);
+    } catch (err: any) {
+      addToast(err.message || 'Error al eliminar', 'error');
+    }
+  };
+
   const lowStockCount = useMemo(() => {
     return products.filter(p => {
       const s = productStock[p.id_venta];
@@ -103,6 +209,10 @@ const InventoryPage: React.FC = () => {
           <p className="page-subtitle">{products.length} productos</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="primary" size="sm" onClick={openNew}>
+            <Plus size={14} className="mr-1" />
+            Nuevo
+          </Button>
           <Button variant="secondary" size="sm" onClick={exportToCSV}>
             <Download size={14} className="mr-1" />
             Excel
@@ -113,14 +223,14 @@ const InventoryPage: React.FC = () => {
       {/* Búsqueda y filtros */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por código o descripción..."
-            className="pl-9"
+            className="pr-9"
           />
+          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
         </div>
         <Button
           variant={showLowStock ? 'danger' : 'secondary'}
@@ -131,6 +241,93 @@ const InventoryPage: React.FC = () => {
           Stock bajo ({lowStockCount})
         </Button>
       </div>
+
+      {/* Formulario de edición */}
+      {showForm && (
+        <Card title={editingId ? `Editar ${editingId}` : 'Nuevo producto'}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+            <div>
+              <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Código</label>
+              <input
+                type="text"
+                value={form.id_venta}
+                onChange={e => setForm({ ...form, id_venta: e.target.value })}
+                disabled={!!editingId}
+                className={editingId ? 'opacity-60' : ''}
+                placeholder="Ej: PROD-001"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">ID Fábrica</label>
+              <input
+                type="text"
+                value={form.id_fabrica}
+                onChange={e => setForm({ ...form, id_fabrica: e.target.value })}
+                placeholder="Ej: FAB-001"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Descripción</label>
+              <input
+                type="text"
+                value={form.description}
+                onChange={e => setForm({ ...form, description: e.target.value })}
+                placeholder="Nombre del producto"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Precio</label>
+              <input
+                type="number"
+                value={form.price}
+                onChange={e => setForm({ ...form, price: e.target.value })}
+                placeholder="0"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Costo</label>
+              <input
+                type="number"
+                value={form.cost}
+                onChange={e => setForm({ ...form, cost: e.target.value })}
+                placeholder="0"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Stock mínimo</label>
+              <input
+                type="number"
+                value={form.min_stock}
+                onChange={e => setForm({ ...form, min_stock: e.target.value })}
+                placeholder="0"
+                min="0"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Categoría</label>
+              <input
+                type="text"
+                value={form.category}
+                onChange={e => setForm({ ...form, category: e.target.value })}
+                placeholder="Ej: Lencería"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
+              <Save size={14} className="mr-1" />
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={resetForm}>
+              Cancelar
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Tabla */}
       <Card padding="none">
@@ -144,6 +341,7 @@ const InventoryPage: React.FC = () => {
                 <th className="text-right">Stock</th>
                 <th className="text-right">Mín</th>
                 <th></th>
+                <th className="w-20">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -164,6 +362,24 @@ const InventoryPage: React.FC = () => {
                     <td className="text-right text-text-muted text-xs">{min || '—'}</td>
                     <td>
                       {isLow && <AlertTriangle size={14} className="text-brick" />}
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <button
+                          className="p-1 rounded text-text-muted hover:text-clay hover:bg-surface transition-colors"
+                          title="Editar"
+                          onClick={() => openEdit(p)}
+                        >
+                          <Save size={14} />
+                        </button>
+                        <button
+                          className="p-1 rounded text-text-muted hover:text-brick hover:bg-surface transition-colors"
+                          title="Eliminar"
+                          onClick={() => handleDelete(p.id_venta)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

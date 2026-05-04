@@ -15,6 +15,7 @@ const SalesPage: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState(currentUser?.locationId || '');
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState(0);
+  const [manualCode, setManualCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Scanner
@@ -105,6 +106,36 @@ const SalesPage: React.FC = () => {
     setScannerReady(false);
   };
 
+  // ── Código manual ──
+  const handleManualCode = () => {
+    const code = manualCode.trim().toUpperCase();
+    if (!code) {
+      addToast('Ingresa un código de producto', 'error');
+      return;
+    }
+
+    const match = products.find(
+      p => p.id_venta === code || p.id_fabrica === code
+    );
+
+    if (match) {
+      setSelectedProduct(match.id_venta);
+      setPrice(match.price);
+      addToast(`Producto encontrado: ${match.id_venta}`, 'success');
+    } else {
+      addToast(`Código no encontrado: ${code}`, 'error');
+    }
+  };
+
+  const handleManualCodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Convertir a mayúsculas mientras escribe
+    setManualCode(prev => prev.toUpperCase());
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleManualCode();
+    }
+  };
+
   // ── Resto de la lógica ──
   const myLocations = currentUser?.role === 'admin'
     ? locations.filter(l => l.isActive !== false)
@@ -176,6 +207,32 @@ const SalesPage: React.FC = () => {
 
       <Card padding="lg">
         <form onSubmit={handleSubmit} className="space-y-5 max-w-lg">
+          {/* Código manual */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Código manual
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualCode}
+                placeholder="Ingresa id_venta o id_fábrica..."
+                onChange={e => setManualCode(e.target.value.toUpperCase())}
+                onKeyDown={handleManualCodeKeyDown}
+                className="flex-1 font-mono"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={handleManualCode}
+                title="Buscar código"
+              >
+                Buscar
+              </Button>
+            </div>
+          </div>
+
           {/* Producto + Scanner */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">Producto</label>

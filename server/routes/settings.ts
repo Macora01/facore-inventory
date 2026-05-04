@@ -2,131 +2,121 @@ import { Router, Request, Response } from 'express';
 import { requireRole } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireDb } from '../lib/db.js';
-import { ok, fail, notFound } from '../lib/response.js';
+import { ok, fail } from '../lib/response.js';
+import { logAudit } from '../config/database.js';
 import bcrypt from 'bcrypt';
 
 const router = Router();
 router.use(requireDb);
 
-// ── GET /api/settings — Configuración general ──
+// ── Config general ──
 router.get('/', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
-  const pool = req.db!;
-  const result = await pool.query('SELECT key, value FROM settings ORDER BY key');
-  const settings: Record<string, string> = {};
-  result.rows.forEach((r: any) => { settings[r.key] = r.value; });
-  ok(res, settings);
+  const result = await req.db!.query('SELECT key, value FROM settings ORDER BY key');
+  const s: Record<string, string> = {};
+  result.rows.forEach((r: any) => { s[r.key] = r.value; });
+  ok(res, s);
 }));
-
-// ── PUT /api/settings ──
 router.put('/', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
-  const pool = req.db!;
-  const data = req.body as Record<string, string>;
-  for (const [key, value] of Object.entries(data)) {
-    await pool.query(
-      `INSERT INTO settings (key, value) VALUES ($1, $2)
-       ON CONFLICT (key) DO UPDATE SET value = $2`,
-      [key, value]
-    );
+  for (const [k, v] of Object.entries(req.body as Record<string, string>)) {
+    await req.db!.query('INSERT INTO settings (key,value) VALUES ($1,$2) ON CONFLICT(key) DO UPDATE SET value=$2', [k, v]);
   }
   ok(res, { success: true });
 }));
 
-// ═══════════════════════════════════════════
-// CRUD Usuarios
-// ═══════════════════════════════════════════
-
-// GET /api/settings/users
+// ═══ CRUD Usuarios ═══
 router.get('/users', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
-  const pool = req.db!;
-  const result = await pool.query(
-    'SELECT id, username, role, display_name, location_id, created_at FROM users ORDER BY username'
-  );
-  ok(res, result.rows);
+  ok(res, (await req.db!.query('SELECT id,username,role,display_name,location_id,created_at FROM users ORDER BY username')).rows);
 }));
-
-// POST /api/settings/users
 router.post('/users', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
   const { username, password, role, displayName, locationId } = req.body;
-  if (!username || !password || !role) {
-    fail(res, 'Campos requeridos: username, password, role'); return;
-  }
-  const pool = req.db!;
+  if (!username || !password || !role) { fail(res, 'username, password, role requeridos'); return; }
   const hash = await bcrypt.hash(password, 12);
-  const id = `usr-${Date.now()}`;
-  await pool.query(
-    `INSERT INTO users (id, username, password, role, display_name, location_id)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, username, hash, role, displayName || null, locationId || null]
-  );
-  ok(res, { id, username, role }, 201);
+  await req.db!.query('INSERT INTO users(id,username,password,role,display_name,location_id) VALUES($1,$2,$3,$4,$5,$6)', [`usr-${Date.now()}`, username, hash, role, displayName||null, locationId||null]);
+  ok(res, { username, role }, 201);
 }));
-
-// PUT /api/settings/users/:id
 router.put('/users/:id', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
   const { username, password, role, displayName, locationId } = req.body;
-  const pool = req.db!;
-
   if (password) {
     const hash = await bcrypt.hash(password, 12);
-    await pool.query(
-      `UPDATE users SET username=$1, password=$2, role=$3, display_name=$4, location_id=$5 WHERE id=$6`,
-      [username, hash, role, displayName || null, locationId || null, id]
-    );
+    await req.db!.query('UPDATE users SET username=$1,password=$2,role=$3,display_name=$4,location_id=$5 WHERE id=$6', [username,hash,role,displayName||null,locationId||null,req.params.id]);
   } else {
-    await pool.query(
-      `UPDATE users SET username=$1, role=$2, display_name=$3, location_id=$4 WHERE id=$5`,
-      [username, role, displayName || null, locationId || null, id]
-    );
+    await req.db!.query('UPDATE users SET username=$1,role=$2,display_name=$3,location_id=$4 WHERE id=$5', [username,role,displayName||null,locationId||null,req.params.id]);
   }
-  ok(res, { id, username, role });
+  ok(res, { id: req.params.id });
 }));
-
-// DELETE /api/settings/users/:id
 router.delete('/users/:id', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  if (id === 'usr-admin') { fail(res, 'No se puede eliminar al admin principal', 403); return; }
-  const pool = req.db!;
-  await pool.query('DELETE FROM users WHERE id = $1', [id]);
-  ok(res, { deleted: id });
+  if (req.params.id === 'usr-admin') { fail(res, 'No se puede eliminar al admin', 403); return; }
+  await req.db!.query('DELETE FROM users WHERE id=$1', [req.params.id]);
+  ok(res, { deleted: req.params.id });
 }));
 
-// ═══════════════════════════════════════════
-// CRUD Ubicaciones
-// ═══════════════════════════════════════════
-
-// POST /api/settings/locations
+// ═══ CRUD Ubicaciones ═══
 router.post('/locations', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
   const { id, name, type, address } = req.body;
-  if (!id || !name || !type) { fail(res, 'Campos requeridos: id, name, type'); return; }
-  const pool = req.db!;
-  await pool.query(
-    `INSERT INTO locations (id, name, type, address) VALUES ($1, $2, $3, $4)
-     ON CONFLICT (id) DO UPDATE SET name=$2, type=$3, address=$4`,
-    [id, name, type, address || null]
-  );
-  ok(res, { id, name, type }, 201);
+  if (!id || !name || !type) { fail(res, 'id,name,type requeridos'); return; }
+  await req.db!.query('INSERT INTO locations(id,name,type,address) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET name=$2,type=$3,address=$4', [id,name,type,address||null]);
+  ok(res, { id, name }, 201);
 }));
-
-// PUT /api/settings/locations/:id
 router.put('/locations/:id', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
   const { name, type, address, isActive } = req.body;
-  const pool = req.db!;
-  await pool.query(
-    `UPDATE locations SET name=$1, type=$2, address=$3, is_active=$4 WHERE id=$5`,
-    [name, type, address || null, isActive !== false, id]
-  );
-  ok(res, { id, name, type });
+  await req.db!.query('UPDATE locations SET name=$1,type=$2,address=$3,is_active=$4 WHERE id=$5', [name,type,address||null,isActive!==false,req.params.id]);
+  ok(res, { id: req.params.id });
+}));
+router.delete('/locations/:id', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  if (req.params.id === 'BODCENT') { fail(res, 'No se puede eliminar BODCENT', 403); return; }
+  await req.db!.query('DELETE FROM locations WHERE id=$1', [req.params.id]);
+  ok(res, { deleted: req.params.id });
 }));
 
-// DELETE /api/settings/locations/:id
-router.delete('/locations/:id', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  if (id === 'BODCENT') { fail(res, 'No se puede eliminar la bodega central', 403); return; }
-  const pool = req.db!;
-  await pool.query('DELETE FROM locations WHERE id = $1', [id]);
-  ok(res, { deleted: id });
+// ═══ Backup / Restore / Clean ═══
+const TABLES = ['products','stock','locations','users','movements','pending_sales','purchase_orders','purchase_order_items','settings','audit_logs'];
+
+router.post('/backup', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  const data: Record<string, any[]> = {};
+  for (const t of TABLES) {
+    try { data[t] = (await req.db!.query(`SELECT * FROM ${t}`)).rows; } catch { data[t] = []; }
+  }
+  await logAudit('INFO', 'backup', 'Backup realizado');
+  ok(res, { backup: data, timestamp: new Date().toISOString() });
+}));
+
+router.post('/restore', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  const { backup, adminPassword } = req.body;
+  if (!adminPassword) { fail(res, 'Password de admin requerido'); return; }
+  const user = await req.db!.query("SELECT password FROM users WHERE username='admin'");
+  if (!user.rows[0] || !(await bcrypt.compare(adminPassword, user.rows[0].password))) {
+    fail(res, 'Password incorrecto', 403); return;
+  }
+  if (!backup || typeof backup !== 'object') { fail(res, 'backup requerido'); return; }
+  for (const t of [...TABLES].reverse()) {
+    try { await req.db!.query(`TRUNCATE TABLE ${t} CASCADE`); } catch {}
+  }
+  for (const t of TABLES) {
+    const rows = backup[t];
+    if (!rows || !rows.length) continue;
+    const cols = Object.keys(rows[0]);
+    for (const row of rows) {
+      const vals = cols.map(c => row[c]);
+      const ph = cols.map((_, i) => `$${i+1}`).join(',');
+      try { await req.db!.query(`INSERT INTO ${t} (${cols.join(',')}) VALUES (${ph})`, vals); } catch {}
+    }
+  }
+  await logAudit('INFO', 'backup', 'Restauración completada');
+  ok(res, { message: 'Base de datos restaurada' });
+}));
+
+router.post('/clean', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
+  const { adminPassword } = req.body;
+  if (!adminPassword) { fail(res, 'Password de admin requerido'); return; }
+  const user = await req.db!.query("SELECT password FROM users WHERE username='admin'");
+  if (!user.rows[0] || !(await bcrypt.compare(adminPassword, user.rows[0].password))) {
+    fail(res, 'Password de administrador incorrecto', 403); return;
+  }
+  for (const t of [...TABLES].reverse()) {
+    try { await req.db!.query(`TRUNCATE TABLE ${t} CASCADE`); } catch {}
+  }
+  await logAudit('INFO', 'backup', 'Base de datos limpiada');
+  ok(res, { message: 'Base de datos limpiada completamente' });
 }));
 
 export default router;
