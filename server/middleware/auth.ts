@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'facore-dev-secret-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
@@ -23,7 +23,7 @@ export function generateToken(payload: JwtPayload): string {
   return jwt.sign(
     payload as object,
     JWT_SECRET,
-    { expiresIn: 86400 } as jwt.SignOptions // 24h en segundos
+    { expiresIn: 86400 }
   );
 }
 
