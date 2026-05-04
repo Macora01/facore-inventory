@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useHashNavigation } from '../hooks/useHashNavigation';
 import {
@@ -36,6 +36,15 @@ const Sidebar: React.FC = () => {
     navigateTo(hash);
     setMobileOpen(false);
   };
+
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
 
   const visibleItems = NAV_ITEMS.filter(
     item => currentUser && item.roles.includes(currentUser.role)
@@ -107,20 +116,24 @@ const Sidebar: React.FC = () => {
       {/* Overlay móvil */}
       {mobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40"
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* Panel móvil */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col
+      {/* Panel móvil (overlay) */}
+      <div className={`lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col
                       transform transition-transform duration-200
-                      lg:translate-x-0
-                      ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+                      ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {sidebarContent}
       </div>
 
-      {/* Botón hamburger — solo móvil */}
+      {/* Desktop sidebar (en flujo) */}
+      <aside className="hidden lg:flex w-56 min-h-screen bg-sidebar flex-col shrink-0">
+        {sidebarContent}
+      </aside>
+
+      {/* Botón hamburger — solo móvil, más visible */}
       <button
         onClick={() => setMobileOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-30 w-11 h-11 flex items-center justify-center
