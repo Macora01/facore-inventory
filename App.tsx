@@ -4,6 +4,8 @@ import { ToastProvider } from './hooks/useToast';
 import { useHashNavigation } from './hooks/useHashNavigation';
 import Sidebar from './components/Sidebar';
 import LoginPage from './pages/LoginPage';
+import SalesPage from './pages/SalesPage';
+import ApprovalsPage from './pages/ApprovalsPage';
 import { motion, AnimatePresence } from 'motion/react';
 
 const AppContent: React.FC = () => {
@@ -30,8 +32,8 @@ const AppContent: React.FC = () => {
   const renderPage = () => {
     switch (currentHash) {
       case '#/inventory': return <PlaceholderPage title="Catálogo" />;
-      case '#/sales': return <PlaceholderPage title="Ventas" />;
-      case '#/approvals': return <PlaceholderPage title="Aprobaciones" />;
+      case '#/sales': return <SalesPage />;
+      case '#/approvals': return <ApprovalsPage />;
       case '#/purchases': return <PlaceholderPage title="Compras" />;
       case '#/movements': return <PlaceholderPage title="Movimientos" />;
       case '#/traceability': return <PlaceholderPage title="Trazabilidad" />;
