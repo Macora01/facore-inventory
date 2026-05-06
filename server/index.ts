@@ -18,6 +18,7 @@ import salesRoutes from './routes/sales.js';
 import purchaseRoutes from './routes/purchases.js';
 import locationRoutes from './routes/locations.js';
 import reportRoutes from './routes/reports.js';
+import traceabilityRoutes from './routes/traceability.js';
 import uploadRoutes from './routes/upload.js';
 import settingsRoutes from './routes/settings.js';
 import seedRoutes from './routes/seed.js';
@@ -75,6 +76,7 @@ async function startServer() {
   app.use('/api/purchases', authenticateToken, purchaseRoutes);
   app.use('/api/locations', authenticateToken, locationRoutes);
   app.use('/api/reports', authenticateToken, reportRoutes);
+  app.use('/api/traceability', authenticateToken, traceabilityRoutes);
   app.use('/api/upload', authenticateToken, uploadRoutes);
   app.use('/api/settings', authenticateToken, settingsRoutes);
   app.use('/api/seed', authenticateToken, seedRoutes);

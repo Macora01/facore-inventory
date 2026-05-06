@@ -11,6 +11,8 @@ import PurchasesPage from './pages/PurchasesPage';
 import MovementsPage from './pages/MovementsPage';
 import UploadPage from './pages/UploadPage';
 import SettingsPage from './pages/SettingsPage';
+import TraceabilityPage from './pages/TraceabilityPage';
+import ReportsPage from './pages/ReportsPage';
 import { motion, AnimatePresence } from 'motion/react';
 
 const AppContent: React.FC = () => {
@@ -41,8 +43,8 @@ const AppContent: React.FC = () => {
       case '#/approvals': return <ApprovalsPage />;
       case '#/purchases': return <PurchasesPage />;
       case '#/movements': return <MovementsPage />;
-      case '#/traceability': return <PlaceholderPage title="Trazabilidad" />;
-      case '#/reports': return <PlaceholderPage title="Reportes" />;
+      case '#/traceability': return <TraceabilityPage />;
+      case '#/reports': return <ReportsPage />;
       case '#/upload': return <UploadPage />;
       case '#/settings': return <SettingsPage />;
       default: return <PlaceholderPage title="Dashboard" />;
