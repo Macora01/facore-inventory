@@ -64,6 +64,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function checkSession() {
+    // ── Verificar estado DB ──
+    try {
+      const h = await fetch(`${API}/health`);
+      if (h.ok) {
+        const hd = await h.json();
+        setDbStatus(hd.database === 'connected' ? 'connected' : 'disconnected');
+      }
+    } catch { setDbStatus('disconnected'); }
+
     try {
       const res = await fetch(`${API}/auth/me`, { credentials: 'include' });
       if (res.ok) {
