@@ -8,7 +8,8 @@ import { fileURLToPath } from 'url';
 import { initDb, getPool } from './config/database.js';
 import { applySecurityMiddleware } from './middleware/security.js';
 import { authenticateToken } from './middleware/auth.js';
-import { globalErrorHandler } from './middleware/errorHandler.js';
+import { globalErrorHandler, asyncHandler } from './middleware/errorHandler.js';
+import { ok, fail } from './lib/response.js';
 
 import authRoutes from './routes/auth.js';
 import productRoutes from './routes/products.js';
