@@ -13,7 +13,10 @@ router.get('/', requireRole('vendedora', 'admin', 'operador', 'visita'), asyncHa
   const pool = req.db!;
   const search = (req.query.search as string || '').trim();
   const lowStock = req.query.lowStock === 'true';
-  let query = `SELECT p.*, COALESCE(SUM(s.quantity), 0)::numeric as total_stock FROM products p LEFT JOIN stock s ON s.product_id = p.id_venta`;
+  let query = `SELECT p.id_venta, p.id_fabrica, p.description, p.price, p.cost,
+       p.min_stock as "minStock", p.image, p.category, p.supplier_id as "supplierId",
+       COALESCE(SUM(s.quantity), 0)::numeric as total_stock
+       FROM products p LEFT JOIN stock s ON s.product_id = p.id_venta`;
   const params: any[] = [];
   const conditions: string[] = [];
   if (search) {
