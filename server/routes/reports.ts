@@ -13,7 +13,9 @@ router.get(
   requireRole('admin', 'operador', 'visita'),
   asyncHandler(async (req: Request, res: Response) => {
     const pool = req.db!;
-    const period = (req.query.period as string) || 'day'; // day | week | month
+    const period = (req.query.period as string) || 'day';
+    const dateFrom = req.query.from as string | undefined;
+    const dateTo = req.query.to as string | undefined;
 
     let dateFormat: string;
     if (period === 'month') {
@@ -24,6 +26,20 @@ router.get(
       dateFormat = "to_char(m.timestamp::date, 'YYYY-MM-DD')";
     }
 
+    const conditions: string[] = ["m.type = 'SALE'"];
+    const params: any[] = [];
+
+    if (dateFrom) {
+      params.push(dateFrom);
+      conditions.push(`m.timestamp::date >= $${params.length}`);
+    }
+    if (dateTo) {
+      params.push(dateTo);
+      conditions.push(`m.timestamp::date <= $${params.length}`);
+    }
+
+    const whereClause = conditions.join(' AND ');
+
     const result = await pool.query(`
       SELECT ${dateFormat} as period,
              COUNT(*)::int as "totalSales",
@@ -31,11 +47,11 @@ router.get(
              COALESCE(SUM(m.price * m.quantity), 0) as "totalRevenue",
              COALESCE(SUM(m.cost * m.quantity), 0) as "totalCost"
       FROM movements m
-      WHERE m.type = 'SALE'
+      WHERE ${whereClause}
       GROUP BY period
       ORDER BY period DESC
       LIMIT 90
-    `);
+    `, params);
 
     const summary = result.rows.map((r: any) => ({
       period: r.period,
@@ -103,7 +119,7 @@ router.get(
              p.id_fabrica as "factoryId",
              p.category,
              p.min_stock as "minStock",
-             COALESCE(SUM(s.quantity), 0) as "currentStock",
+             s.quantity as "currentStock",
              l.name as "locationName",
              s.location_id as "locationId",
              s.quantity

@@ -3,9 +3,9 @@ import { useToast } from '../hooks/useToast';
 import Card from '../components/Card';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell,
 } from 'recharts';
-import { TrendingUp, Package, AlertTriangle, MapPin } from 'lucide-react';
+import { TrendingUp, Package, AlertTriangle, MapPin, Download } from 'lucide-react';
 
 const API = '/api';
 
@@ -64,9 +64,12 @@ const ReportsPage: React.FC = () => {
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('sales');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // ── Ventas ──
   const [salesPeriod, setSalesPeriod] = useState<'day' | 'week' | 'month'>('day');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [salesData, setSalesData] = useState<SalesSummaryItem[]>([]);
 
   // ── Productos ──
@@ -81,27 +84,59 @@ const ReportsPage: React.FC = () => {
   // ── Cargar datos según tab ──
   useEffect(() => {
     setLoading(true);
+    setError(null);
 
     if (activeTab === 'sales') {
-      fetch(`${API}/reports/sales-summary?period=${salesPeriod}`, { credentials: 'include' })
-        .then(res => res.json())
-        .then(data => setSalesData(Array.isArray(data) ? data : []))
-        .catch(() => addToast('Error al cargar datos de ventas', 'error'))
+      const params = new URLSearchParams({ period: salesPeriod });
+      if (dateFrom) params.set('from', dateFrom);
+      if (dateTo) params.set('to', dateTo);
+
+      fetch(`${API}/reports/sales-summary?${params}`, { credentials: 'include' })
+        .then(async res => {
+          if (!res.ok) throw new Error(`Error ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          setSalesData(Array.isArray(data) ? data : []);
+          setError(null);
+        })
+        .catch(err => {
+          setError('No se pudieron cargar los datos de ventas');
+          setSalesData([]);
+        })
         .finally(() => setLoading(false));
     } else if (activeTab === 'products') {
       fetch(`${API}/reports/top-products?limit=15`, { credentials: 'include' })
-        .then(res => res.json())
-        .then(data => setTopProducts(Array.isArray(data) ? data : []))
-        .catch(() => addToast('Error al cargar top productos', 'error'))
+        .then(async res => {
+          if (!res.ok) throw new Error(`Error ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          setTopProducts(Array.isArray(data) ? data : []);
+          setError(null);
+        })
+        .catch(() => {
+          setError('No se pudieron cargar los datos de productos');
+          setTopProducts([]);
+        })
         .finally(() => setLoading(false));
     } else if (activeTab === 'stock') {
       fetch(`${API}/reports/stock-status`, { credentials: 'include' })
-        .then(res => res.json())
-        .then(data => setStockData(data))
-        .catch(() => addToast('Error al cargar estado de stock', 'error'))
+        .then(async res => {
+          if (!res.ok) throw new Error(`Error ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          setStockData(data);
+          setError(null);
+        })
+        .catch(() => {
+          setError('No se pudieron cargar los datos de stock');
+          setStockData(null);
+        })
         .finally(() => setLoading(false));
     }
-  }, [activeTab, salesPeriod]);
+  }, [activeTab, salesPeriod, dateFrom, dateTo]);
 
   // ── Totales de ventas ──
   const salesTotals = salesData.reduce(
@@ -114,11 +149,104 @@ const ReportsPage: React.FC = () => {
     { revenue: 0, cost: 0, qty: 0, count: 0 }
   );
 
+  // ── Exportar ──
+  const exportData = async (format: 'csv' | 'xlsx' | 'pdf') => {
+    let label = '';
+    let columns: string[] = [];
+    let rows: any[][] = [];
+
+    if (activeTab === 'sales') {
+      label = 'ventas';
+      columns = ['Período', 'Ventas', 'Cantidad', 'Ingresos', 'Costo', 'Margen'];
+      rows = salesData.map(s => [s.period, s.totalSales, s.totalQuantity, s.totalRevenue, s.totalCost, s.margin]);
+    } else if (activeTab === 'products') {
+      label = 'productos-top';
+      columns = ['#', 'Producto', 'ID', 'Categoría', 'Vendido', 'Ventas', 'Ingresos'];
+      rows = topProducts.map((p, i) => [i + 1, p.productDescription, p.productId, p.category || '', p.totalSold, p.saleCount, p.totalRevenue]);
+    } else if (activeTab === 'stock' && stockData) {
+      label = 'stock';
+      columns = ['Producto', 'ID', 'Ubicación', 'Stock', 'Mínimo', 'Estado'];
+      rows = stockData.lowStock.map(item => [
+        item.productDescription, item.productId, item.locationName,
+        item.quantity, item.minStock,
+        item.quantity === 0 ? 'Agotado' : 'Bajo'
+      ]);
+    }
+
+    if (rows.length === 0) {
+      addToast('No hay datos para exportar', 'info');
+      return;
+    }
+
+    try {
+      if (format === 'csv') {
+        const Papa = (await import('papaparse')).default;
+        const csv = Papa.unparse({ fields: columns, data: rows });
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+        downloadBlob(blob, `reporte-${label}-${new Date().toISOString().slice(0, 10)}.csv`);
+      } else if (format === 'xlsx') {
+        const XLSX = (await import('xlsx')).default;
+        const ws = XLSX.utils.aoa_to_sheet([columns, ...rows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
+        XLSX.writeFile(wb, `reporte-${label}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      } else if (format === 'pdf') {
+        const { default: jsPDF } = await import('jspdf');
+        const { default: autoTable } = await import('jspdf-autotable');
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.setFontSize(14);
+        doc.text(`Reporte — ${activeTab === 'sales' ? 'Ventas' : activeTab === 'products' ? 'Top Productos' : 'Stock'}`, 14, 15);
+        autoTable(doc, {
+          head: [columns],
+          body: rows,
+          startY: 22,
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [125, 107, 92] },
+        });
+        doc.save(`reporte-${label}-${new Date().toISOString().slice(0, 10)}.pdf`);
+      }
+      addToast(`Reporte exportado como ${format.toUpperCase()}`, 'success');
+    } catch (err) {
+      addToast('Error al exportar', 'error');
+    }
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // ── Render ──
   return (
     <div className="page-container animate-fade-in space-y-6">
-      <h2 className="page-title">Reportes</h2>
-      <p className="page-subtitle">Estadísticas y análisis del inventario</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="page-title">Reportes</h2>
+          <p className="page-subtitle">Estadísticas y análisis del inventario</p>
+        </div>
+
+        {/* Botones exportar */}
+        {!loading && !error && (
+          <div className="flex gap-2">
+            {(['csv', 'xlsx', 'pdf'] as const).map(fmt => (
+              <button
+                key={fmt}
+                onClick={() => exportData(fmt)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium
+                           bg-surface border border-border text-text-muted
+                           hover:text-clay hover:border-clay/30 transition-colors min-h-[36px]"
+              >
+                <Download size={14} />
+                {fmt.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── Tabs ── */}
       <div className="flex gap-1 p-1 bg-surface rounded-xl border border-border w-fit">
@@ -149,29 +277,63 @@ const ReportsPage: React.FC = () => {
         </div>
       )}
 
+      {error && (
+        <div className="p-8 rounded-xl bg-brick/5 border border-brick/15 text-center">
+          <AlertTriangle size={32} className="mx-auto text-brick mb-3" />
+          <p className="text-brick font-medium">{error}</p>
+          <p className="text-sm text-text-muted mt-1">Revisa la conexión e inténtalo de nuevo</p>
+        </div>
+      )}
+
       {/* ═══════════════ VENTAS ═══════════════ */}
-      {!loading && activeTab === 'sales' && (
+      {!loading && !error && activeTab === 'sales' && (
         <div className="space-y-6">
-          {/* Selector de período */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-text-muted">Agrupar por:</span>
-            {([
-              ['day', 'Día'],
-              ['week', 'Semana'],
-              ['month', 'Mes'],
-            ] as const).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setSalesPeriod(key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-                           ${salesPeriod === key
-                             ? 'bg-clay/10 text-clay'
-                             : 'text-text-muted hover:text-text'
-                           }`}
-              >
-                {label}
-              </button>
-            ))}
+          {/* Selector de período + rango fechas */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-muted">Agrupar:</span>
+              {([
+                ['day', 'Día'],
+                ['week', 'Semana'],
+                ['month', 'Mes'],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setSalesPeriod(key)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                             ${salesPeriod === key
+                               ? 'bg-clay/10 text-clay'
+                               : 'text-text-muted hover:text-text'
+                             }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-muted">Desde:</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                className="text-sm py-1.5 px-2 min-h-[36px] w-36"
+              />
+              <span className="text-sm text-text-muted">Hasta:</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                className="text-sm py-1.5 px-2 min-h-[36px] w-36"
+              />
+              {(dateFrom || dateTo) && (
+                <button
+                  onClick={() => { setDateFrom(''); setDateTo(''); }}
+                  className="text-xs text-text-muted hover:text-brick transition-colors"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Resumen */}
@@ -192,28 +354,18 @@ const ReportsPage: React.FC = () => {
           {/* Gráfico de barras */}
           <Card title="Ventas por período" padding="none">
             {salesData.length === 0 ? (
-              <p className="p-8 text-center text-sm text-text-muted">Sin datos de ventas</p>
+              <p className="p-8 text-center text-sm text-text-muted">Sin datos de ventas en este rango</p>
             ) : (
               <div className="p-4">
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={salesData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
-                    <XAxis
-                      dataKey="period"
-                      tick={{ fontSize: 11, fill: '#888' }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: '#888' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
+                    <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#888' }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#888' }} tickLine={false} axisLine={false} />
                     <Tooltip
                       contentStyle={{
-                        background: '#fff',
-                        border: '1px solid #e5e5e0',
-                        borderRadius: '12px',
-                        fontSize: '13px',
+                        background: '#fff', border: '1px solid #e5e5e0',
+                        borderRadius: '12px', fontSize: '13px',
                       }}
                       formatter={(value: any) => formatCLP(Number(value))}
                     />
@@ -224,7 +376,7 @@ const ReportsPage: React.FC = () => {
             )}
           </Card>
 
-          {/* Tabla de ventas */}
+          {/* Tabla */}
           {salesData.length > 0 && (
             <Card title="Detalle" padding="none">
               <div className="overflow-x-auto">
@@ -259,9 +411,8 @@ const ReportsPage: React.FC = () => {
       )}
 
       {/* ═══════════════ PRODUCTOS ═══════════════ */}
-      {!loading && activeTab === 'products' && (
+      {!loading && !error && activeTab === 'products' && (
         <div className="space-y-6">
-          {/* Gráfico de barras horizontal */}
           <Card title="Top 15 — Más Vendidos" padding="none">
             {topProducts.length === 0 ? (
               <p className="p-8 text-center text-sm text-text-muted">Sin datos de ventas</p>
@@ -269,26 +420,18 @@ const ReportsPage: React.FC = () => {
               <div className="p-4">
                 <ResponsiveContainer width="100%" height={Math.max(300, topProducts.length * 28)}>
                   <BarChart
-                    data={[...topProducts].reverse()} // invertir para que el #1 quede arriba
+                    data={[...topProducts].reverse()}
                     layout="vertical"
                     margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" horizontal={false} />
                     <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} tickLine={false} axisLine={false} />
-                    <YAxis
-                      type="category"
-                      dataKey="productDescription"
-                      tick={{ fontSize: 11, fill: '#555' }}
-                      tickLine={false}
-                      axisLine={false}
-                      width={115}
-                    />
+                    <YAxis type="category" dataKey="productDescription" tick={{ fontSize: 11, fill: '#555' }}
+                      tickLine={false} axisLine={false} width={115} />
                     <Tooltip
                       contentStyle={{
-                        background: '#fff',
-                        border: '1px solid #e5e5e0',
-                        borderRadius: '12px',
-                        fontSize: '13px',
+                        background: '#fff', border: '1px solid #e5e5e0',
+                        borderRadius: '12px', fontSize: '13px',
                       }}
                       formatter={(value: any) => [`${value} uds.`, 'Vendido']}
                     />
@@ -299,30 +442,20 @@ const ReportsPage: React.FC = () => {
             )}
           </Card>
 
-          {/* Tabla */}
           {topProducts.length > 0 && (
             <Card title="Detalle" padding="none">
               <div className="overflow-x-auto">
                 <table className="facore-table w-full">
                   <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Producto</th>
-                      <th>Categoría</th>
-                      <th>Vendido</th>
-                      <th>Ventas</th>
-                      <th>Ingresos</th>
-                    </tr>
+                    <tr><th>#</th><th>Producto</th><th>Categoría</th><th>Vendido</th><th>Ventas</th><th>Ingresos</th></tr>
                   </thead>
                   <tbody>
                     {topProducts.map((p, i) => (
                       <tr key={p.productId}>
                         <td className="font-semibold text-text-muted">{i + 1}</td>
                         <td>
-                          <div>
-                            <span className="font-medium">{p.productDescription}</span>
-                            <span className="text-xs text-text-muted ml-2">{p.productId}</span>
-                          </div>
+                          <span className="font-medium">{p.productDescription}</span>
+                          <span className="text-xs text-text-muted ml-2">{p.productId}</span>
                         </td>
                         <td>{p.category || '—'}</td>
                         <td className="font-semibold">{p.totalSold}</td>
@@ -339,7 +472,7 @@ const ReportsPage: React.FC = () => {
       )}
 
       {/* ═══════════════ STOCK ═══════════════ */}
-      {!loading && activeTab === 'stock' && stockData && (
+      {!loading && !error && activeTab === 'stock' && stockData && (
         <div className="space-y-6">
           {/* Resumen */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -357,9 +490,8 @@ const ReportsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Distribución por ubicación */}
+          {/* Distribución */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfico de torta */}
             <Card title="Distribución por Ubicación" padding="none">
               {stockData.distribution.length === 0 ? (
                 <p className="p-8 text-center text-sm text-text-muted">Sin datos</p>
@@ -371,12 +503,9 @@ const ReportsPage: React.FC = () => {
                         data={stockData.distribution}
                         dataKey="totalItems"
                         nameKey="locationName"
-                        cx="50%"
-                        cy="50%"
+                        cx="50%" cy="50%"
                         outerRadius={100}
-                        label={({ name, value }) =>
-                          `${name} (${value})`
-                        }
+                        label={({ name, value }) => `${name} (${value})`}
                         labelLine={{ stroke: '#ccc', strokeWidth: 1 }}
                       >
                         {stockData.distribution.map((_, i) => (
@@ -385,10 +514,8 @@ const ReportsPage: React.FC = () => {
                       </Pie>
                       <Tooltip
                         contentStyle={{
-                          background: '#fff',
-                          border: '1px solid #e5e5e0',
-                          borderRadius: '12px',
-                          fontSize: '13px',
+                          background: '#fff', border: '1px solid #e5e5e0',
+                          borderRadius: '12px', fontSize: '13px',
                         }}
                         formatter={(value: any) => [`${value} uds.`, 'Items']}
                       />
@@ -398,7 +525,6 @@ const ReportsPage: React.FC = () => {
               )}
             </Card>
 
-            {/* Tabla distribución */}
             <Card title="Detalle por Ubicación" padding="none">
               <div className="divide-y divide-border">
                 {stockData.distribution.map(d => (
@@ -417,28 +543,20 @@ const ReportsPage: React.FC = () => {
             </Card>
           </div>
 
-          {/* Alertas stock bajo */}
+          {/* Alertas */}
           {stockData.lowStock.length > 0 && (
             <Card title={`⚠️ Productos bajo stock mínimo (${stockData.lowStock.length})`} padding="none">
               <div className="overflow-x-auto">
                 <table className="facore-table w-full">
                   <thead>
-                    <tr>
-                      <th>Producto</th>
-                      <th>Ubicación</th>
-                      <th>Stock</th>
-                      <th>Mínimo</th>
-                      <th>Estado</th>
-                    </tr>
+                    <tr><th>Producto</th><th>Ubicación</th><th>Stock</th><th>Mínimo</th><th>Estado</th></tr>
                   </thead>
                   <tbody>
                     {stockData.lowStock.map(item => (
                       <tr key={`${item.productId}-${item.locationId}`}>
                         <td>
-                          <div>
-                            <span className="font-medium">{item.productDescription}</span>
-                            <span className="text-xs text-text-muted ml-2">{item.productId}</span>
-                          </div>
+                          <span className="font-medium">{item.productDescription}</span>
+                          <span className="text-xs text-text-muted ml-2">{item.productId}</span>
                         </td>
                         <td>{item.locationName}</td>
                         <td className="font-semibold text-brick">{item.quantity}</td>
@@ -464,10 +582,6 @@ const ReportsPage: React.FC = () => {
             </Card>
           )}
         </div>
-      )}
-
-      {!loading && activeTab === 'stock' && !stockData && (
-        <p className="text-center text-sm text-text-muted py-8">Cargando datos de stock...</p>
       )}
     </div>
   );
