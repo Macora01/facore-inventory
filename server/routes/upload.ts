@@ -46,6 +46,27 @@ function parseInput(body: any): { data: any[]; error?: string } {
   return { data: [], error: 'Se requiere csv (texto) o xlsx (base64)' };
 }
 
+/** Limpiar valor numérico: quita $, espacios, y separadores de miles (. ,) */
+function cleanNum(val: any): number {
+  if (val === null || val === undefined || val === '') return 0;
+  let s = String(val).trim();
+  // Quitar símbolo de moneda
+  s = s.replace(/[$€£]/g, '');
+  // Si tiene coma decimal y punto de miles (estilo chileno/europeo: 14.009,50)
+  if (s.includes(',') && s.includes('.')) {
+    // Asumir que el punto es separador de miles y la coma es decimal
+    s = s.replace(/\./g, '').replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+/** Limpiar valor entero */
+function cleanInt(val: any, fallback = 0): number {
+  const n = Math.round(cleanNum(val));
+  return isNaN(n) ? fallback : n;
+}
+
 // ── POST /api/upload/products ──
 router.post('/products', requireRole('admin', 'operador'), asyncHandler(async (req: Request, res: Response) => {
   const { data, error } = parseInput(req.body);
@@ -60,11 +81,11 @@ router.post('/products', requireRole('admin', 'operador'), asyncHandler(async (r
       const idVenta = row.id_venta || row.codigo || row.cod_venta;
       const idFabrica = row.id_fabrica || row.cod_fabrica || '';
       const description = row.description || row.descripcion || row.producto || '';
-      const price = parseFloat(row.price || row.precio || '0');
-      const cost = parseFloat(row.cost || row.costo || '0');
-      const minStock = parseInt(row.min_stock || row.stock_minimo || '2');
+      const price = cleanNum(row.price || row.precio);
+      const cost = cleanNum(row.cost || row.costo);
+      const minStock = cleanInt(row.min_stock || row.stock_minimo, 2);
       const category = row.category || row.categoria || '';
-      const qty = parseInt(row.qty || row.cantidad || row.stock || '0');
+      const qty = cleanInt(row.qty || row.cantidad || row.stock);
 
       if (!idVenta || !description) {
         errors.push(`Fila ${created + 1}: falta código o descripción`);
