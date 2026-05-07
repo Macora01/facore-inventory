@@ -69,7 +69,7 @@ router.delete('/locations/:id', requireRole('admin'), asyncHandler(async (req: R
 }));
 
 // ═══ Backup / Restore / Clean ═══
-const TABLES = ['products','stock','locations','users','movements','pending_sales','purchase_orders','purchase_order_items','settings','audit_logs'];
+const TABLES = ['products','stock','locations','users','movements','pending_sales','purchase_orders','purchase_order_items','settings','audit_logs','factory_images'];
 
 router.post('/backup', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
   const data: Record<string, any[]> = {};
@@ -112,11 +112,23 @@ router.post('/clean', requireRole('admin'), asyncHandler(async (req: Request, re
   if (!user.rows[0] || !(await bcrypt.compare(adminPassword, user.rows[0].password))) {
     fail(res, 'Password de administrador incorrecto', 403); return;
   }
+
+  const errors: string[] = [];
   for (const t of [...TABLES].reverse()) {
-    try { await req.db!.query(`TRUNCATE TABLE ${t} CASCADE`); } catch {}
+    try { await req.db!.query(`TRUNCATE TABLE ${t} CASCADE`); }
+    catch (err: any) { errors.push(`${t}: ${err.message}`); }
   }
+
+  // Recrear lo mínimo indispensable
+  await req.db!.query("INSERT INTO locations (id, name, type, is_active) VALUES ('BODCENT','Bodega Central','WAREHOUSE',true) ON CONFLICT DO NOTHING");
+  await req.db!.query("INSERT INTO users (id, username, password, role, display_name) VALUES ('usr-admin','admin','$2b$12$YRab5KSThy1/NsRNVnO0/.SYQBl480HYmcWBx2V0QFNFfjNCmK3ZW','admin','Administrador') ON CONFLICT DO NOTHING");
+
   await logAudit('INFO', 'backup', 'Base de datos limpiada');
-  ok(res, { message: 'Base de datos limpiada completamente' });
+  if (errors.length > 0) {
+    ok(res, { message: 'Base de datos limpiada con advertencias', warnings: errors });
+  } else {
+    ok(res, { message: 'Base de datos limpiada completamente' });
+  }
 }));
 
 export default router;
