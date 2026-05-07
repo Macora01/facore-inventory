@@ -38,15 +38,41 @@ router.get('/:id', requireRole('vendedora', 'admin', 'operador', 'visita'), asyn
 
 // ── POST /api/products — Crear ──
 router.post('/', requireRole('admin', 'operador'), asyncHandler(async (req: Request, res: Response) => {
-  const { id_venta, id_fabrica, description, price, cost, min_stock, category, image } = req.body;
+  const { id_venta, id_fabrica, description, price, cost, min_stock, category, image, initialStock, initialLocation } = req.body;
   if (!id_venta || !description) { fail(res, 'id_venta y description requeridos'); return; }
-  await req.db!.query(
+
+  const pool = req.db!;
+  const locationId = initialLocation || 'BODCENT';
+
+  await pool.query(
     `INSERT INTO products (id_venta, id_fabrica, description, price, cost, min_stock, category, image)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [id_venta, id_fabrica||'', description, price||0, cost||0, min_stock||2, category||'', image||null]
   );
-  await logAudit('INFO', 'products', `Producto creado: ${id_venta}`);
-  ok(res, { id_venta, description }, 201);
+
+  // ── Stock inicial ──
+  const stockQty = parseInt(initialStock, 10) || 0;
+  if (stockQty > 0) {
+    // Upsert en stock
+    await pool.query(
+      `INSERT INTO stock (product_id, location_id, quantity)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (product_id, location_id)
+       DO UPDATE SET quantity = stock.quantity + $3`,
+      [id_venta, locationId, stockQty]
+    );
+
+    // Movimiento INITIAL_LOAD para trazabilidad
+    const movId = `MOV-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await pool.query(
+      `INSERT INTO movements (id, product_id, to_location_id, quantity, type, timestamp, created_by)
+       VALUES ($1, $2, $3, $4, 'INITIAL_LOAD', $5, $6)`,
+      [movId, id_venta, locationId, stockQty, new Date().toISOString(), req.body.createdBy || 'sistema']
+    );
+  }
+
+  await logAudit('INFO', 'products', `Producto creado: ${id_venta}${stockQty > 0 ? ` (+${stockQty} uds. en ${locationId})` : ''}`);
+  ok(res, { id_venta, description, initialStock: stockQty }, 201);
 }));
 
 // ── PUT /api/products/:id ──

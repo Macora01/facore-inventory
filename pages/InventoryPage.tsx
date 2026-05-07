@@ -23,6 +23,7 @@ const InventoryPage: React.FC = () => {
     cost: '',
     min_stock: '',
     category: '',
+    initial_stock: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -107,13 +108,13 @@ const InventoryPage: React.FC = () => {
   // ── CRUD ──
   const resetForm = () => {
     setEditingId(null);
-    setForm({ id_venta: '', id_fabrica: '', description: '', price: '', cost: '', min_stock: '', category: '' });
+    setForm({ id_venta: '', id_fabrica: '', description: '', price: '', cost: '', min_stock: '', category: '', initial_stock: '' });
     setShowForm(false);
   };
 
   const openNew = () => {
     setEditingId(null);
-    setForm({ id_venta: '', id_fabrica: '', description: '', price: '', cost: '', min_stock: '', category: '' });
+    setForm({ id_venta: '', id_fabrica: '', description: '', price: '', cost: '', min_stock: '', category: '', initial_stock: '' });
     setShowForm(true);
   };
 
@@ -127,6 +128,7 @@ const InventoryPage: React.FC = () => {
       cost: String(p.cost),
       min_stock: p.minStock != null ? String(p.minStock) : '',
       category: p.category || '',
+      initial_stock: '',
     });
     setShowForm(true);
   };
@@ -146,6 +148,7 @@ const InventoryPage: React.FC = () => {
         cost: Number(form.cost) || 0,
         min_stock: form.min_stock ? Number(form.min_stock) : null,
         category: form.category.trim() || null,
+        initialStock: form.initial_stock ? Number(form.initial_stock) : 0,
       };
 
       if (editingId) {
@@ -307,6 +310,20 @@ const InventoryPage: React.FC = () => {
                 min="0"
               />
             </div>
+            {!editingId && (
+              <div>
+                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">
+                  Stock inicial <span className="text-text-muted font-normal">(BODCENT)</span>
+                </label>
+                <input
+                  type="number"
+                  value={form.initial_stock}
+                  onChange={e => setForm({ ...form, initial_stock: e.target.value })}
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Categoría</label>
               <input

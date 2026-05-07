@@ -64,6 +64,7 @@ router.post('/products', requireRole('admin', 'operador'), asyncHandler(async (r
       const cost = parseFloat(row.cost || row.costo || '0');
       const minStock = parseInt(row.min_stock || row.stock_minimo || '2');
       const category = row.category || row.categoria || '';
+      const qty = parseInt(row.qty || row.cantidad || row.stock || '0');
 
       if (!idVenta || !description) {
         errors.push(`Fila ${created + 1}: falta código o descripción`);
@@ -78,6 +79,25 @@ router.post('/products', requireRole('admin', 'operador'), asyncHandler(async (r
            min_stock = $6, category = $7`,
         [idVenta, idFabrica, description, price, cost, minStock, category]
       );
+
+      // ── Stock inicial si se especificó qty ──
+      if (qty > 0) {
+        await pool.query(
+          `INSERT INTO stock (product_id, location_id, quantity)
+           VALUES ($1, 'BODCENT', $2)
+           ON CONFLICT (product_id, location_id)
+           DO UPDATE SET quantity = stock.quantity + $2`,
+          [idVenta, qty]
+        );
+
+        const movId = `MOV-BULK-${Date.now()}-${created}-${Math.random().toString(36).slice(2, 6)}`;
+        await pool.query(
+          `INSERT INTO movements (id, product_id, to_location_id, quantity, type, timestamp, created_by)
+           VALUES ($1, $2, 'BODCENT', $3, 'INITIAL_LOAD', $4, 'carga_masiva')`,
+          [movId, idVenta, qty, new Date().toISOString()]
+        );
+      }
+
       created++;
     } catch (err: any) {
       errors.push(`Error fila ${created + 1}: ${err.message}`);
