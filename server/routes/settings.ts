@@ -109,10 +109,16 @@ router.post('/clean', requireRole('admin'), asyncHandler(async (req: Request, re
   const { adminPassword } = req.body;
   if (!adminPassword) { fail(res, 'Password de admin requerido'); return; }
   const username = req.user!.username;
-  const user = await req.db!.query('SELECT password FROM users WHERE username = $1', [username]);
+  const user = await req.db!.query('SELECT * FROM users WHERE username = $1', [username]);
   if (!user.rows[0] || !(await bcrypt.compare(adminPassword, user.rows[0].password))) {
     fail(res, 'Password de administrador incorrecto', 403); return;
   }
+
+  // Guardar este admin para recrearlo post-TRUNCATE
+  const thisAdmin = user.rows[0];
+  const otherAdmins = await req.db!.query(
+    "SELECT * FROM users WHERE role = 'admin' AND username != $1", [username]
+  );
 
   const errors: string[] = [];
   for (const t of [...TABLES].reverse()) {
@@ -120,9 +126,20 @@ router.post('/clean', requireRole('admin'), asyncHandler(async (req: Request, re
     catch (err: any) { errors.push(`${t}: ${err.message}`); }
   }
 
-  // Recrear lo mínimo indispensable
+  // Recrear BODCENT
   await req.db!.query("INSERT INTO locations (id, name, type, is_active) VALUES ('BODCENT','Bodega Central','WAREHOUSE',true)");
-  await req.db!.query("INSERT INTO users (id, username, password, role, display_name) VALUES ('usr-admin','admin','$2b$12$YRab5KSThy1/NsRNVnO0/.SYQBl480HYmcWBx2V0QFNFfjNCmK3ZW','admin','Administrador')");
+  // Recrear el admin que ejecutó la limpieza
+  await req.db!.query(
+    'INSERT INTO users (id, username, password, role, display_name) VALUES ($1,$2,$3,$4,$5)',
+    [thisAdmin.id, thisAdmin.username, thisAdmin.password, thisAdmin.role, thisAdmin.display_name]
+  );
+  // Recrear otros admins si existían
+  for (const a of otherAdmins.rows) {
+    await req.db!.query(
+      'INSERT INTO users (id, username, password, role, display_name) VALUES ($1,$2,$3,$4,$5)',
+      [a.id, a.username, a.password, a.role, a.display_name]
+    );
+  }
 
   await logAudit('INFO', 'backup', 'Base de datos limpiada');
   if (errors.length > 0) {
