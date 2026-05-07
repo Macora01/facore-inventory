@@ -106,47 +106,37 @@ router.post('/restore', requireRole('admin'), asyncHandler(async (req: Request, 
 }));
 
 router.post('/clean', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
-  const { adminPassword } = req.body;
+  const { adminPassword, target } = req.body;
   if (!adminPassword) { fail(res, 'Password de admin requerido'); return; }
   const username = req.user!.username;
-  const user = await req.db!.query('SELECT * FROM users WHERE username = $1', [username]);
+  const user = await req.db!.query('SELECT password FROM users WHERE username = $1', [username]);
   if (!user.rows[0] || !(await bcrypt.compare(adminPassword, user.rows[0].password))) {
     fail(res, 'Password de administrador incorrecto', 403); return;
   }
 
-  // Guardar este admin para recrearlo post-TRUNCATE
-  const thisAdmin = user.rows[0];
-  const otherAdmins = await req.db!.query(
-    "SELECT * FROM users WHERE role = 'admin' AND username != $1", [username]
-  );
-
+  const t = target || 'all';
   const errors: string[] = [];
-  for (const t of [...TABLES].reverse()) {
-    try { await req.db!.query(`TRUNCATE TABLE ${t} CASCADE`); }
-    catch (err: any) { errors.push(`${t}: ${err.message}`); }
+  const pool = req.db!;
+
+  if (t === 'products' || t === 'all') {
+    for (const tbl of ['purchase_order_items','purchase_orders','pending_sales','movements','stock','products']) {
+      try { await pool.query(`TRUNCATE TABLE ${tbl} CASCADE`); }
+      catch (err: any) { errors.push(`${tbl}: ${err.message}`); }
+    }
   }
 
-  // Recrear BODCENT
-  await req.db!.query("INSERT INTO locations (id, name, type, is_active) VALUES ('BODCENT','Bodega Central','WAREHOUSE',true)");
-  // Recrear el admin que ejecutó la limpieza
-  await req.db!.query(
-    'INSERT INTO users (id, username, password, role, display_name) VALUES ($1,$2,$3,$4,$5)',
-    [thisAdmin.id, thisAdmin.username, thisAdmin.password, thisAdmin.role, thisAdmin.display_name]
-  );
-  // Recrear otros admins si existían
-  for (const a of otherAdmins.rows) {
-    await req.db!.query(
-      'INSERT INTO users (id, username, password, role, display_name) VALUES ($1,$2,$3,$4,$5)',
-      [a.id, a.username, a.password, a.role, a.display_name]
-    );
+  if (t === 'locations' || t === 'all') {
+    try { await pool.query("DELETE FROM locations WHERE id != 'BODCENT'"); }
+    catch (err: any) { errors.push(`locations: ${err.message}`); }
   }
 
-  await logAudit('INFO', 'backup', 'Base de datos limpiada');
-  if (errors.length > 0) {
-    ok(res, { message: 'Base de datos limpiada con advertencias', warnings: errors });
-  } else {
-    ok(res, { message: 'Base de datos limpiada completamente' });
+  if (t === 'users' || t === 'all') {
+    try { await pool.query("DELETE FROM users WHERE role != 'admin'"); }
+    catch (err: any) { errors.push(`users: ${err.message}`); }
   }
+
+  await logAudit('INFO', 'backup', `Limpieza tipo ${t}`);
+  ok(res, { message: `Limpieza completada (${t})`, warnings: errors.length > 0 ? errors : undefined });
 }));
 
 export default router;

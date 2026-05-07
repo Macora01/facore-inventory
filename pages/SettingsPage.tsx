@@ -20,6 +20,7 @@ const SettingsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [dbPassword, setDbPassword] = useState('');
   const [dbLoading, setDbLoading] = useState(false);
+  const [cleanTarget, setCleanTarget] = useState<'products' | 'locations' | 'users' | 'all'>('all');
 
   // Users state
   const [users, setUsers] = useState<any[]>([]);
@@ -148,18 +149,18 @@ const SettingsPage: React.FC = () => {
 
   const handleClean = async () => {
     if (!dbPassword) { addToast('Ingresa la contraseña de administrador', 'error'); return; }
-    if (!confirm('⚠️ ¿Estás seguro? Esta acción ELIMINARÁ TODOS los datos de la base de datos. No se puede deshacer.')) return;
+    if (!confirm(`⚠️ ¿Estás seguro? Se limpiará: ${cleanTarget === 'all' ? 'TODA la base de datos' : cleanTarget === 'products' ? 'Productos, stock y movimientos' : cleanTarget === 'locations' ? 'Ubicaciones (excepto BODCENT)' : 'Usuarios no admin'}. No se puede deshacer.`)) return;
     setDbLoading(true);
     try {
       const res = await fetch('/api/settings/clean', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminPassword: dbPassword }),
+        body: JSON.stringify({ adminPassword: dbPassword, target: cleanTarget }),
       });
       const r = await res.json();
       if (!res.ok) throw new Error(r.message || 'Error al limpiar');
-      addToast(r.message || 'Base de datos limpiada', 'success');
+      addToast(r.message || 'Limpieza completada', 'success');
       setDbPassword('');
     } catch (e: any) {
       addToast(e.message || 'Error al limpiar', 'error');
@@ -331,9 +332,18 @@ const SettingsPage: React.FC = () => {
 
           <Card title="Limpieza">
             <p className="text-sm text-text-muted mb-3">
-              Elimina <strong>todos</strong> los registros de la base de datos. Esta acción no se puede deshacer.
+              Elimina registros de forma selectiva. Los administradores y BODCENT nunca se eliminan.
             </p>
             <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">¿Qué limpiar?</label>
+                <select value={cleanTarget} onChange={e => setCleanTarget(e.target.value as any)}>
+                  <option value="products">🧥 Productos, stock y movimientos</option>
+                  <option value="locations">📍 Ubicaciones (excepto BODCENT)</option>
+                  <option value="users">👤 Usuarios no administradores</option>
+                  <option value="all">⚠️ Todo (productos + ubicaciones + usuarios)</option>
+                </select>
+              </div>
               <input
                 type="password"
                 placeholder="Contraseña de administrador"
@@ -341,7 +351,7 @@ const SettingsPage: React.FC = () => {
                 onChange={e => setDbPassword(e.target.value)}
               />
               <Button variant="danger" loading={dbLoading} onClick={handleClean}>
-                <Trash2 size={14} /> Limpiar base de datos
+                <Trash2 size={14} /> Limpiar
               </Button>
             </div>
           </Card>
