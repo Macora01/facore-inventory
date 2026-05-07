@@ -13,6 +13,7 @@ import UploadPage from './pages/UploadPage';
 import SettingsPage from './pages/SettingsPage';
 import TraceabilityPage from './pages/TraceabilityPage';
 import ReportsPage from './pages/ReportsPage';
+import DashboardPage from './pages/DashboardPage';
 import { motion, AnimatePresence } from 'motion/react';
 
 const AppContent: React.FC = () => {
@@ -47,7 +48,7 @@ const AppContent: React.FC = () => {
       case '#/reports': return <ReportsPage />;
       case '#/upload': return <UploadPage />;
       case '#/settings': return <SettingsPage />;
-      default: return <PlaceholderPage title="Dashboard" />;
+      default: return <DashboardPage />;
     }
   };
 
