@@ -83,6 +83,35 @@ async function startServer() {
   app.use('/api/settings', authenticateToken, settingsRoutes);
   app.use('/api/seed', authenticateToken, seedRoutes);
 
+  // ── EMERGENCY: recrear DB desde cero (se eliminará después de usar) ──
+  app.post('/api/emergency/init-db', async (_req, res) => {
+    const p = getPool();
+    if (!p) return res.status(503).json({ error: 'DB no disponible' });
+    try {
+      await p.query('BEGIN');
+      // Limpiar
+      await p.query('TRUNCATE TABLE stock, movements, pending_sales, purchase_order_items, purchase_orders, products, users, locations CASCADE');
+      // Ubicaciones
+      await p.query(`INSERT INTO locations (id, name, type, is_active) VALUES 
+        ('BODCENT','Bodega Central','WAREHOUSE',true),
+        ('TIENDA1','Tienda Principal','FIXED_STORE_PERMANENT',true),
+        ('TIENDA2','Tienda Secundaria','FIXED_STORE_PERMANENT',true),
+        ('TEMP1','Tienda Temporal','FIXED_STORE_TEMPORARY',true),
+        ('IND1','Tienda Indirecta','INDIRECT_STORE',true),
+        ('WEB','Tienda Web','ONLINE_STORE',true),
+        ('CASA','Casa','HOME_STORE',true)`);
+      // Admin
+      const bcrypt = (await import('bcrypt')).default;
+      const hash = await bcrypt.hash('admin123', 12);
+      await p.query("INSERT INTO users (id, username, password, role, display_name) VALUES ('usr-admin','admin',$1,'admin','Administrador')", [hash]);
+      await p.query('COMMIT');
+      res.json({ ok: true, message: 'DB recreada: 7 ubicaciones + admin/admin123' });
+    } catch (err: any) {
+      await p.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── Error handler global (debe ir después de las rutas) ──
   app.use(globalErrorHandler);
 
