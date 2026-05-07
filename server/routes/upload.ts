@@ -75,6 +75,7 @@ router.post('/products', requireRole('admin', 'operador'), asyncHandler(async (r
 
   const pool = req.db!;
   let created = 0;
+  let skipped = 0;
   const errors: string[] = [];
 
   for (const row of data) {
@@ -89,16 +90,20 @@ router.post('/products', requireRole('admin', 'operador'), asyncHandler(async (r
       const qty = cleanInt(row.qty || row.cantidad || row.stock);
 
       if (!idVenta || !description) {
-        errors.push(`Fila ${created + 1}: falta código o descripción`);
+        errors.push(`Fila ${created + skipped + 1}: falta código o descripción`);
+        continue;
+      }
+
+      // Verificar si ya existe
+      const exists = await pool.query('SELECT id_venta FROM products WHERE id_venta = $1', [idVenta]);
+      if (exists.rows.length > 0) {
+        skipped++;
         continue;
       }
 
       await pool.query(
         `INSERT INTO products (id_venta, id_fabrica, description, price, cost, min_stock, category)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (id_venta) DO UPDATE SET
-           id_fabrica = $2, description = $3, price = $4, cost = $5,
-           min_stock = $6, category = $7`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [idVenta, idFabrica, description, price, cost, minStock, category]
       );
 
@@ -126,8 +131,8 @@ router.post('/products', requireRole('admin', 'operador'), asyncHandler(async (r
     }
   }
 
-  await logAudit('INFO', 'upload', `Carga productos: ${created} procesados`);
-  ok(res, { created, errors: errors.slice(0, 10) }, 201);
+  await logAudit('INFO', 'upload', `Carga productos: ${created} nuevos, ${skipped} existentes saltados`);
+  ok(res, { created, skipped, errors: errors.slice(0, 10) }, 201);
 }));
 
 // ── POST /api/upload/transfers ──

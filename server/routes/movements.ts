@@ -14,7 +14,10 @@ router.get('/', requireRole('vendedora', 'admin', 'operador', 'visita'), asyncHa
   const productId = req.query.productId as string | undefined;
 
   let query = `
-    SELECT m.*, p.description as "productDescription"
+    SELECT m.id, m.product_id as "productId", m.from_location_id as "fromLocationId",
+           m.to_location_id as "toLocationId", m.quantity, m.type, m.reason,
+           m.timestamp, m.related_file as "relatedFile", m.price, m.cost, m.created_by as "createdBy",
+           p.description as "productDescription"
     FROM movements m
     LEFT JOIN products p ON m.product_id = p.id_venta
     WHERE 1=1

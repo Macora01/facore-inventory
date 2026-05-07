@@ -120,8 +120,8 @@ router.post('/clean', requireRole('admin'), asyncHandler(async (req: Request, re
   }
 
   // Recrear lo mínimo indispensable
-  await req.db!.query("INSERT INTO locations (id, name, type, is_active) VALUES ('BODCENT','Bodega Central','WAREHOUSE',true) ON CONFLICT DO NOTHING");
-  await req.db!.query("INSERT INTO users (id, username, password, role, display_name) VALUES ('usr-admin','admin','$2b$12$YRab5KSThy1/NsRNVnO0/.SYQBl480HYmcWBx2V0QFNFfjNCmK3ZW','admin','Administrador') ON CONFLICT DO NOTHING");
+  await req.db!.query("INSERT INTO locations (id, name, type, is_active) VALUES ('BODCENT','Bodega Central','WAREHOUSE',true)");
+  await req.db!.query("INSERT INTO users (id, username, password, role, display_name) VALUES ('usr-admin','admin','$2b$12$YRab5KSThy1/NsRNVnO0/.SYQBl480HYmcWBx2V0QFNFfjNCmK3ZW','admin','Administrador')");
 
   await logAudit('INFO', 'backup', 'Base de datos limpiada');
   if (errors.length > 0) {
