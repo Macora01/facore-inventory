@@ -77,6 +77,7 @@ export const MOVEMENT_TYPE_LABEL: Record<MovementType, string> = {
 export interface Movement {
   id: string;
   productId: string;
+  productDescription?: string;
   fromLocationId?: string;
   toLocationId?: string;
   quantity: number;

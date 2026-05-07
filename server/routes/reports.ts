@@ -269,6 +269,11 @@ router.get(
       revenueNeto,
       marginNeto,
       marginNetoPercent: revenueNeto > 0 ? Math.round((marginNeto / revenueNeto) * 100) : 0,
+      // ── Proyecciones de venta del inventario actual SIN IVA ──
+      inventoryValueNeto: Math.round(Number(c.totalValue) / 1.19),
+      projected100: Math.round((Number(c.totalValue) / 1.19) - Number(c.totalCost)),
+      projected95: Math.round(((Number(c.totalValue) / 1.19) - Number(c.totalCost)) * 0.95),
+      projected90: Math.round(((Number(c.totalValue) / 1.19) - Number(c.totalCost)) * 0.90),
       stockDistribution: stockDistribution.rows.map((r: any) => ({
         category: r.category,
         quantity: Number(r.quantity),

@@ -30,6 +30,10 @@ interface DashboardData {
   revenueNeto: number;
   marginNeto: number;
   marginNetoPercent: number;
+  inventoryValueNeto: number;
+  projected100: number;
+  projected95: number;
+  projected90: number;
   stockDistribution: { category: string; quantity: number }[];
   sales7d: { fecha: string; ventas: number; unidades: number; ingresos: number }[];
 }
@@ -206,6 +210,28 @@ const DashboardPage: React.FC = () => {
           </div>
         ))})()}
       </div>
+
+      {/* ── Proyecciones de Margen s/IVA ── */}
+      <Card title="Proyección de Venta del Inventario Actual (sin IVA)" padding="none">
+        <div className="grid grid-cols-3 divide-x divide-border">
+          {[
+            ['100%', data.projected100, 'Venta total del stock'],
+            ['95%', data.projected95, 'Holgura del 5%'],
+            ['90%', data.projected90, 'Escenario conservador'],
+          ].map(([pct, monto, desc], i) => (
+            <div key={i} className="p-4 text-center">
+              <p className="text-xs text-text-muted uppercase tracking-wider">{pct} stock</p>
+              <p className={`text-xl font-bold mt-1 ${monto >= 0 ? 'text-sage' : 'text-brick'}`}>
+                {formatCLP(monto as number)}
+              </p>
+              <p className="text-xs text-text-muted mt-1">{desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="px-4 pb-3 text-xs text-text-muted">
+          Stock valorizado sin IVA: {formatCLP(data.inventoryValueNeto)} · Costo: {formatCLP(data.inventoryCost)}
+        </div>
+      </Card>
 
       {/* ── Gráficos ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

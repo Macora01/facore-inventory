@@ -70,7 +70,10 @@ const MovementsPage: React.FC = () => {
                       {MOVEMENT_TYPE_LABEL[m.type as MovementType] || m.type}
                     </span>
                   </td>
-                  <td className="text-sm">{m.productId}</td>
+                  <td className="text-sm">
+                    <span className="font-medium">{m.productId}</span>
+                    {m.productDescription && <span className="text-xs text-text-muted ml-1">— {m.productDescription}</span>}
+                  </td>
                   <td className="text-right font-medium">{m.quantity}</td>
                   <td className="text-xs text-text-muted">{m.fromLocationId || '—'}</td>
                   <td className="text-xs text-text-muted">{m.toLocationId || '—'}</td>
