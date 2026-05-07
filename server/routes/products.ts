@@ -22,7 +22,7 @@ router.get('/', requireRole('vendedora', 'admin', 'operador', 'visita'), asyncHa
   }
   if (lowStock) conditions.push(`p.min_stock IS NOT NULL`);
   if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');
-  query += ' GROUP BY p.id_venta ORDER BY p.description ASC LIMIT 300';
+  query += ' GROUP BY p.id_venta ORDER BY p.description ASC LIMIT 1000';
   let rows = (await pool.query(query, params)).rows;
   if (lowStock) rows = rows.filter((r: any) => Number(r.total_stock) <= (Number(r.min_stock) || 0));
   ok(res, rows);
