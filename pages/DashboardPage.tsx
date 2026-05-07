@@ -2,52 +2,70 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../hooks/useToast';
 import Card from '../components/Card';
-import { Brain, Package, TrendingUp, AlertTriangle, ChevronDown, Save, X, Sparkles } from 'lucide-react';
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+} from 'recharts';
+import {
+  Brain, Package, TrendingUp, AlertTriangle,
+  DollarSign, BarChart3, ChevronDown, Save, Sparkles, Store, Warehouse,
+} from 'lucide-react';
 
 const API = '/api';
 
-// ── Providers predefinidos ──
-const PROVIDERS: { id: string; label: string; baseUrl: string; model: string }[] = [
+const PIE_COLORS = ['#7D6B5C', '#5C7D6B', '#C49B5C', '#A65D5D'];
+
+interface DashboardData {
+  totalProducts: number;
+  totalStock: number;
+  sales30d: number;
+  revenue30d: number;
+  cost30d: number;
+  margin30d: number;
+  marginPercent: number;
+  pendingCount: number;
+  lowStockCount: number;
+  inventoryCost: number;
+  inventoryValue: number;
+  stockDistribution: { category: string; quantity: number }[];
+  sales7d: { fecha: string; ventas: number; unidades: number; ingresos: number }[];
+}
+
+const PROVIDERS = [
   { id: 'deepseek', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
   { id: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o' },
   { id: 'custom', label: 'Personalizado', baseUrl: '', model: '' },
 ];
 
-// ── Renderizador simple de Markdown ──
+// ── Renderizador Markdown ──
 function renderMarkdown(text: string): string {
-  let html = text
-    // Escapar HTML
+  return text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    // Encabezados
     .replace(/^#### (.+)$/gm, '<h4 class="text-sm font-semibold text-text mt-4 mb-1">$1</h4>')
     .replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold text-text mt-5 mb-2">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 class="text-lg font-bold text-clay mt-6 mb-3 border-b border-border pb-1">$1</h2>')
     .replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold text-clay mt-6 mb-3">$1</h1>')
-    // Negrita e itálica
     .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Listas numeradas
     .replace(/^\d+\.\s(.+)$/gm, '<li class="ml-4 list-decimal text-sm text-text leading-relaxed">$1</li>')
-    // Listas no numeradas
     .replace(/^[-•]\s(.+)$/gm, '<li class="ml-4 list-disc text-sm text-text leading-relaxed">$1</li>')
-    // Separadores
     .replace(/^───+/gm, '<hr class="my-4 border-border" />')
-    // Párrafos: líneas no vacías que no son ya HTML tags
     .replace(/^(?!<[a-z/])(.+)$/gm, '<p class="text-sm text-text leading-relaxed my-2">$1</p>')
-    // Juntar <li> consecutivos en <ul>
     .replace(/((?:<li class="ml-4 list-disc[^>]*>.*?<\/li>\n?)+)/g, '<ul class="my-2">$1</ul>')
     .replace(/((?:<li class="ml-4 list-decimal[^>]*>.*?<\/li>\n?)+)/g, '<ol class="my-2">$1</ol>')
-    // Limpiar saltos extra
     .replace(/\n{3,}/g, '\n\n');
-
-  return html;
 }
 
+const formatCLP = (n: number) => '$' + Math.round(n).toLocaleString('es-CL');
+
 const DashboardPage: React.FC = () => {
-  const { products, stock, movements, pendingSales, currentUser, fetchData } = useApp();
+  const { currentUser } = useApp();
   const { addToast } = useToast();
 
-  // ── AI Panel ──
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // AI Panel
   const [showAI, setShowAI] = useState(false);
   const [provider, setProvider] = useState('deepseek');
   const [apiKey, setApiKey] = useState('');
@@ -59,94 +77,71 @@ const DashboardPage: React.FC = () => {
 
   const isAdmin = currentUser?.role === 'admin';
 
-  // ── Cargar API Key guardada ──
+  // Cargar API Key guardada
   useEffect(() => {
-    const saved = localStorage.getItem('facore_ai_key');
-    const savedProvider = localStorage.getItem('facore_ai_provider');
-    if (saved) setApiKey(saved);
-    if (savedProvider) setProvider(savedProvider);
+    setApiKey(localStorage.getItem('facore_ai_key') || '');
+    const sp = localStorage.getItem('facore_ai_provider');
+    if (sp) setProvider(sp);
   }, []);
 
-  // ── Datos para el dashboard ──
-  const totalProducts = products.length;
-  const totalStock = stock.reduce((sum, s) => sum + s.quantity, 0);
-  const lowStockCount = products.filter(p => {
-    const total = stock.filter(s => s.productId === p.id_venta).reduce((sum, s) => sum + s.quantity, 0);
-    return total <= (p.minStock ?? 2);
-  }).length;
-  const pendingCount = pendingSales.filter(s => s.status === 'pending').length;
-  const recentSales = movements.filter(m => m.type === 'SALE').length;
-  const totalRevenue = movements
-    .filter(m => m.type === 'SALE' && m.price)
-    .reduce((sum, m) => sum + (m.price || 0) * m.quantity, 0);
+  // Cargar datos dashboard
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API}/reports/dashboard-summary`, { credentials: 'include' })
+      .then(async res => {
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        return res.json();
+      })
+      .then(json => setData(json))
+      .catch(() => addToast('Error al cargar dashboard', 'error'))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const formatCLP = (n: number) => '$' + Math.round(n).toLocaleString('es-CL');
-
-  // ── Disparar análisis AI ──
+  // ── Análisis AI ──
   const handleAnalyze = async () => {
-    if (!apiKey.trim()) {
-      addToast('Ingresa tu API Key', 'error');
-      return;
-    }
-
+    if (!apiKey.trim()) { addToast('Ingresa tu API Key', 'error'); return; }
     const prov = PROVIDERS.find(p => p.id === provider)!;
     const baseUrl = provider === 'custom' ? customBaseUrl : prov.baseUrl;
     const model = provider === 'custom' ? customModel : prov.model;
+    if (!baseUrl) { addToast('Ingresa la URL base', 'error'); return; }
+    if (saveKey) { localStorage.setItem('facore_ai_key', apiKey); localStorage.setItem('facore_ai_provider', provider); }
 
-    if (!baseUrl) {
-      addToast('Ingresa la URL base del endpoint', 'error');
-      return;
-    }
-
-    // Guardar en localStorage si el usuario marcó la opción
-    if (saveKey) {
-      localStorage.setItem('facore_ai_key', apiKey);
-      localStorage.setItem('facore_ai_provider', provider);
-    }
-
-    setAnalyzing(true);
-    setAiResult('');
-
+    setAnalyzing(true); setAiResult('');
     try {
       const res = await fetch(`${API}/ai/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ apiKey, baseUrl, model }),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || `Error ${res.status}`);
-      }
-
-      setAiResult(data.analysis);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
+      setAiResult(json.analysis);
       addToast('Análisis completado', 'success');
     } catch (err: any) {
-      addToast(err.message || 'Error al analizar', 'error');
-    } finally {
-      setAnalyzing(false);
-    }
+      addToast(err.message, 'error');
+    } finally { setAnalyzing(false); }
   };
 
-  const currentProvider = PROVIDERS.find(p => p.id === provider)!;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="w-10 h-10 border-2 border-clay border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  // ── Cargar datos al montar ──
-  useEffect(() => {
-    fetchData('products');
-    fetchData('stock');
-    fetchData('movements');
-    fetchData('sales/pending');
-  }, []);
+  if (!data) return null;
 
   return (
     <div className="page-container animate-fade-in space-y-6">
-      {/* Cabecera */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="page-title">Dashboard</h2>
-          <p className="page-subtitle">Resumen del sistema</p>
+      {/* ── Cabecera con Logo ── */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4">
+          <img src="/logo.png" alt="Boa Ideia" className="h-10 w-auto" />
+          <div>
+            <h2 className="page-title">Dashboard</h2>
+            <p className="page-subtitle">Panel de control</p>
+          </div>
         </div>
         {isAdmin && (
           <button
@@ -165,33 +160,107 @@ const DashboardPage: React.FC = () => {
         )}
       </div>
 
-      {/* ── KPIs ── */}
+      {/* ── KPIs Principales ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {([
-          [totalProducts, 'Productos', Package, 'text-clay'],
-          [totalStock, 'En Stock', Package, 'text-sage'],
-          [recentSales, 'Ventas', TrendingUp, 'text-clay'],
-          [lowStockCount, 'Stock Bajo', AlertTriangle, lowStockCount > 0 ? 'text-brick' : 'text-sage'],
-          [pendingCount, 'Pendientes', AlertTriangle, pendingCount > 0 ? 'text-amber' : 'text-text-muted'],
-        ] as [number, string, React.FC<{ size?: number }>, string][]).map(([value, label, Icon, colorClass], i) => (
-          <div key={i} className="p-4 rounded-xl bg-surface border border-border">
+          [data.totalProducts, 'Productos', Package, 'text-clay', 'bg-clay/5 border-clay/10'],
+          [data.totalStock, 'Stock Total', Package, 'text-sage', 'bg-sage/5 border-sage/10'],
+          [data.sales30d, 'Ventas 30d', TrendingUp, 'text-clay', 'bg-clay/5 border-clay/10'],
+          [data.lowStockCount, 'Stock Bajo', AlertTriangle, data.lowStockCount > 0 ? 'text-brick' : 'text-sage',
+           data.lowStockCount > 0 ? 'bg-brick/5 border-brick/15' : 'bg-sage/5 border-sage/10'],
+          [data.pendingCount, 'Pendientes', AlertTriangle, data.pendingCount > 0 ? 'text-amber' : 'text-text-muted',
+           data.pendingCount > 0 ? 'bg-amber/5 border-amber/15' : 'bg-surface border-border'],
+        ] as [number, string, React.FC<{ size?: number }>, string, string][]).map(([value, label, Icon, color, bg], i) => (
+          <div key={i} className={`p-4 rounded-xl border ${bg}`}>
             <div className="flex items-center gap-2 mb-2">
-              <Icon size={16} />
-              <p className="text-xs text-text-muted uppercase tracking-wider">{label as string}</p>
+              <Icon size={18} />
+              <p className="text-xs text-text-muted uppercase tracking-wider">{label}</p>
             </div>
-            <p className={`text-xl font-bold ${colorClass}`}>{value as number}</p>
+            <p className={`text-2xl font-bold ${color}`}>{value}</p>
           </div>
         ))}
       </div>
 
-      {/* Ingresos totales */}
-      <div className="p-5 rounded-xl bg-clay/5 border border-clay/10">
-        <p className="text-xs text-text-muted uppercase tracking-wider">Ingresos Totales (ventas registradas)</p>
-        <p className="text-2xl font-bold text-clay mt-1">{formatCLP(totalRevenue)}</p>
+      {/* ── Métricas Financieras ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {(() => {
+          const metrics: [string, string, string, React.FC<{ size?: number }>, string, string][] = [
+            ['Ingresos 30 días', formatCLP(data.revenue30d), formatCLP(data.cost30d) + ' costo', DollarSign, 'text-sage', 'bg-sage/5 border-sage/10'],
+            ['Costo Inventario', formatCLP(data.inventoryCost), 'Valor: ' + formatCLP(data.inventoryValue), BarChart3, 'text-clay', 'bg-clay/5 border-clay/10'],
+            ['Margen', formatCLP(data.margin30d), data.marginPercent + '%', TrendingUp, data.margin30d >= 0 ? 'text-clay' : 'text-brick',
+             data.margin30d >= 0 ? 'bg-clay/5 border-clay/10' : 'bg-brick/5 border-brick/15'],
+          ];
+          return metrics.map(([label, value, sub, Icon, color, bg], i) => (
+          <div key={i} className={`p-4 rounded-xl border ${bg}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <Icon size={16} />
+              <p className="text-xs text-text-muted uppercase tracking-wider">{label}</p>
+            </div>
+            <p className={`text-xl font-bold ${color}`}>{value}</p>
+            <p className="text-xs text-text-muted mt-0.5">{sub}</p>
+          </div>
+        ))})()}
       </div>
 
-      {/* ── Panel AI ── */}
-      {showAI && (
+      {/* ── Gráficos ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Distribución Stock */}
+        <Card title="Distribución de Stock" padding="none">
+          {data.stockDistribution.length === 0 ? (
+            <p className="p-6 text-center text-sm text-text-muted">Sin datos</p>
+          ) : (
+            <div className="p-4">
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={data.stockDistribution}
+                    dataKey="quantity"
+                    nameKey="category"
+                    cx="50%" cy="50%"
+                    outerRadius={90}
+                    label={({ name, value }) => `${name}: ${value} uds.`}
+                    labelLine={{ stroke: '#ccc', strokeWidth: 1 }}
+                  >
+                    {data.stockDistribution.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: '#fff', border: '1px solid #e5e5e0', borderRadius: '12px', fontSize: '13px' }}
+                    formatter={(value: any) => [`${value} uds.`, '']}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+
+        {/* Ventas 7 días */}
+        <Card title="Ventas — Últimos 7 Días" padding="none">
+          {data.sales7d.length === 0 ? (
+            <p className="p-6 text-center text-sm text-text-muted">Sin ventas este período</p>
+          ) : (
+            <div className="p-4">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={data.sales7d} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
+                  <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: '#888' }}
+                    tickFormatter={d => d.slice(5)} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#888' }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{ background: '#fff', border: '1px solid #e5e5e0', borderRadius: '12px', fontSize: '13px' }}
+                    formatter={(value: any) => formatCLP(Number(value))}
+                  />
+                  <Bar dataKey="ingresos" fill="#5C7D6B" radius={[6, 6, 0, 0]} name="Ingresos" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* ── Panel AI (solo admin) ── */}
+      {isAdmin && showAI && (
         <Card>
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -199,117 +268,88 @@ const DashboardPage: React.FC = () => {
               <h3 className="text-lg font-semibold text-text">Análisis de Inteligencia Artificial</h3>
             </div>
             <p className="text-sm text-text-muted">
-              El sistema envía los datos actuales del inventario a la AI para obtener análisis,
-              sugerencias y predicciones. Solo tú (admin) puedes ejecutar este análisis.
+              El sistema envía los datos reales del inventario a la AI para obtener análisis,
+              sugerencias y predicciones con y sin las acciones recomendadas.
             </p>
 
-            {/* Configuración */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">
-                  Proveedor
-                </label>
-                <select
-                  value={provider}
-                  onChange={e => setProvider(e.target.value)}
-                >
-                  {PROVIDERS.map(p => (
-                    <option key={p.id} value={p.id}>{p.label}</option>
-                  ))}
+                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Proveedor</label>
+                <select value={provider} onChange={e => setProvider(e.target.value)}>
+                  {PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">
-                  API Key
-                </label>
+                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">API Key</label>
                 <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={e => setApiKey(e.target.value)}
-                    placeholder={currentProvider.id === 'deepseek' ? 'sk-...' : 'sk-...'}
-                    className="flex-1"
-                  />
+                  <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
+                    placeholder="sk-..." className="flex-1" />
                   <button
                     onClick={() => setSaveKey(!saveKey)}
-                    className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px]
-                               flex items-center justify-center
-                               ${saveKey
-                                 ? 'bg-clay/10 border-clay text-clay'
-                                 : 'border-border text-text-muted hover:text-text'
-                               }`}
+                    className={`p-2.5 rounded-lg border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center
+                      ${saveKey ? 'bg-clay/10 border-clay text-clay' : 'border-border text-text-muted hover:text-text'}`}
                     title="Guardar en este navegador"
-                  >
-                    <Save size={16} />
-                  </button>
+                  ><Save size={16} /></button>
                 </div>
-                {saveKey && (
-                  <p className="text-xs text-sage mt-1">Se guardará en este navegador</p>
-                )}
+                {saveKey && <p className="text-xs text-sage mt-1">Guardada en este navegador</p>}
               </div>
             </div>
 
-            {/* Opciones personalizadas */}
             {provider === 'custom' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">
-                    URL Base
-                  </label>
-                  <input
-                    type="text"
-                    value={customBaseUrl}
-                    onChange={e => setCustomBaseUrl(e.target.value)}
-                    placeholder="https://api.deepseek.com/v1"
-                  />
+                  <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">URL Base</label>
+                  <input type="text" value={customBaseUrl} onChange={e => setCustomBaseUrl(e.target.value)}
+                    placeholder="https://api.deepseek.com/v1" />
                 </div>
                 <div>
-                  <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">
-                    Modelo
-                  </label>
-                  <input
-                    type="text"
-                    value={customModel}
-                    onChange={e => setCustomModel(e.target.value)}
-                    placeholder="deepseek-chat"
-                  />
+                  <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Modelo</label>
+                  <input type="text" value={customModel} onChange={e => setCustomModel(e.target.value)}
+                    placeholder="deepseek-chat" />
                 </div>
               </div>
             )}
 
-            {/* Botón analizar */}
             <button
-              onClick={handleAnalyze}
-              disabled={analyzing}
+              onClick={handleAnalyze} disabled={analyzing}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl
                          bg-clay text-white font-medium hover:bg-clay-dark transition-colors
                          disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
             >
               {analyzing ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Analizando inventario...
-                </>
+                <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Analizando inventario...</>
               ) : (
-                <>
-                  <Brain size={18} />
-                  Analizar Inventario
-                </>
+                <><Brain size={18} /> Analizar Inventario</>
               )}
             </button>
 
-            {/* Resultado */}
             {aiResult && (
               <div className="mt-4 p-5 rounded-xl bg-canvas border border-border">
-                <div
-                  className="prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(aiResult) }}
-                />
+                <div className="prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(aiResult) }} />
               </div>
             )}
           </div>
         </Card>
       )}
+
+      {/* ── Accesos rápidos ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          ['#/inventory', 'Catálogo', 'Gestionar productos y stock'],
+          ['#/sales', 'Vender', 'Registrar una venta'],
+          ['#/reports', 'Reportes', 'Estadísticas detalladas'],
+          ['#/traceability', 'Trazabilidad', 'Rastrear un producto'],
+        ].map(([hash, label, desc]) => (
+          <a key={hash} href={hash}
+            className="block p-4 rounded-xl bg-surface border border-border
+                       hover:border-clay/30 hover:shadow-sm transition-all group">
+            <p className="text-sm font-semibold text-text group-hover:text-clay transition-colors">{label}</p>
+            <p className="text-xs text-text-muted mt-1">{desc}</p>
+          </a>
+        ))}
+      </div>
     </div>
   );
 };
