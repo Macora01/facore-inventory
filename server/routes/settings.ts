@@ -108,7 +108,8 @@ router.post('/restore', requireRole('admin'), asyncHandler(async (req: Request, 
 router.post('/clean', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
   const { adminPassword } = req.body;
   if (!adminPassword) { fail(res, 'Password de admin requerido'); return; }
-  const user = await req.db!.query("SELECT password FROM users WHERE username='admin'");
+  const username = req.user!.username;
+  const user = await req.db!.query('SELECT password FROM users WHERE username = $1', [username]);
   if (!user.rows[0] || !(await bcrypt.compare(adminPassword, user.rows[0].password))) {
     fail(res, 'Password de administrador incorrecto', 403); return;
   }
