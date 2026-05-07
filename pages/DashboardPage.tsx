@@ -27,6 +27,9 @@ interface DashboardData {
   lowStockCount: number;
   inventoryCost: number;
   inventoryValue: number;
+  revenueNeto: number;
+  marginNeto: number;
+  marginNetoPercent: number;
   stockDistribution: { category: string; quantity: number }[];
   sales7d: { fecha: string; ventas: number; unidades: number; ingresos: number }[];
 }
@@ -182,13 +185,15 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* ── Métricas Financieras ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {(() => {
           const metrics: [string, string, string, React.FC<{ size?: number }>, string, string][] = [
-            ['Ingresos 30 días', formatCLP(data.revenue30d), formatCLP(data.cost30d) + ' costo', DollarSign, 'text-sage', 'bg-sage/5 border-sage/10'],
-            ['Costo Inventario', formatCLP(data.inventoryCost), 'Valor: ' + formatCLP(data.inventoryValue), BarChart3, 'text-clay', 'bg-clay/5 border-clay/10'],
-            ['Margen', formatCLP(data.margin30d), data.marginPercent + '%', TrendingUp, data.margin30d >= 0 ? 'text-clay' : 'text-brick',
-             data.margin30d >= 0 ? 'bg-clay/5 border-clay/10' : 'bg-brick/5 border-brick/15'],
+            ['Ingresos 30d', formatCLP(data.revenue30d), 'c/IVA · s/IVA: ' + formatCLP(data.revenueNeto), DollarSign, 'text-sage', 'bg-sage/5 border-sage/10'],
+            ['Costo Inventario', formatCLP(data.inventoryCost), 'Valor venta: ' + formatCLP(data.inventoryValue), BarChart3, 'text-clay', 'bg-clay/5 border-clay/10'],
+            ['Margen Bruto', formatCLP(data.margin30d), data.marginPercent + '% (c/IVA)', TrendingUp, data.margin30d >= 0 ? 'text-amber' : 'text-brick',
+             data.margin30d >= 0 ? 'bg-amber/5 border-amber/15' : 'bg-brick/5 border-brick/15'],
+            ['Margen Neto', formatCLP(data.marginNeto), data.marginNetoPercent + '% (s/IVA 19%)', TrendingUp, data.marginNeto >= 0 ? 'text-clay' : 'text-brick',
+             data.marginNeto >= 0 ? 'bg-clay/5 border-clay/10' : 'bg-brick/5 border-brick/15'],
           ];
           return metrics.map(([label, value, sub, Icon, color, bg], i) => (
           <div key={i} className={`p-4 rounded-xl border ${bg}`}>

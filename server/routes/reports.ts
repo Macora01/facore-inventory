@@ -249,21 +249,26 @@ router.get(
 
     const t = totals.rows[0];
     const c = inventoryCost.rows[0];
+    const revenue = Number(t.revenue30d);
+    const cost = Number(t.cost30d);
+    const revenueNeto = Math.round(revenue / 1.19);
+    const marginNeto = revenueNeto - cost;
 
     ok(res, {
       totalProducts: t.totalProducts,
       totalStock: Number(t.totalStock),
       sales30d: t.sales30d,
-      revenue30d: Number(t.revenue30d),
-      cost30d: Number(t.cost30d),
+      revenue30d: revenue,
+      cost30d: cost,
       pendingCount: t.pendingCount,
       lowStockCount: t.lowStockCount,
       inventoryCost: Number(c.totalCost),
       inventoryValue: Number(c.totalValue),
-      margin30d: Number(t.revenue30d) - Number(t.cost30d),
-      marginPercent: Number(t.revenue30d) > 0
-        ? Math.round(((Number(t.revenue30d) - Number(t.cost30d)) / Number(t.revenue30d)) * 100)
-        : 0,
+      margin30d: revenue - cost,
+      marginPercent: revenue > 0 ? Math.round(((revenue - cost) / revenue) * 100) : 0,
+      revenueNeto,
+      marginNeto,
+      marginNetoPercent: revenueNeto > 0 ? Math.round((marginNeto / revenueNeto) * 100) : 0,
       stockDistribution: stockDistribution.rows.map((r: any) => ({
         category: r.category,
         quantity: Number(r.quantity),

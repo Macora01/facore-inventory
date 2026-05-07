@@ -63,6 +63,7 @@ function cleanNum(val: any): number {
 
 /** Limpiar valor entero */
 function cleanInt(val: any, fallback = 0): number {
+  if (val === null || val === undefined || val === '') return fallback;
   const n = Math.round(cleanNum(val));
   return isNaN(n) ? fallback : n;
 }
