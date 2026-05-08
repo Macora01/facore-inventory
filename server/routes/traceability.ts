@@ -41,10 +41,10 @@ router.get(
     const history = movResult.rows;
 
     // ── 3. Totales ──
-    // totalPurchased: INITIAL_LOAD + TRANSFER_IN (lo que entró al sistema)
+    // totalPurchased: INITIAL_LOAD + PURCHASE (entradas externas, no transferencias)
     const totalsResult = await pool.query(
       `SELECT
-         COALESCE(SUM(CASE WHEN type IN ('INITIAL_LOAD', 'TRANSFER_IN') THEN quantity ELSE 0 END), 0) as "totalPurchased",
+         COALESCE(SUM(CASE WHEN type IN ('INITIAL_LOAD', 'PURCHASE') THEN quantity ELSE 0 END), 0) as "totalPurchased",
          COALESCE(SUM(CASE WHEN type = 'SALE' THEN quantity ELSE 0 END), 0) as "totalSold"
        FROM movements
        WHERE product_id = $1`,
