@@ -59,6 +59,19 @@ interface StockStatus {
   grandTotal: number;
 }
 
+interface StockDetailItem {
+  productId: string;
+  productDescription: string;
+  factoryId: string;
+  category: string;
+  minStock: number;
+  price: number;
+  cost: number;
+  quantity: number;
+  locationName: string;
+  locationId: string;
+}
+
 type Tab = 'sales' | 'products' | 'stock';
 
 const ReportsPage: React.FC = () => {
@@ -114,6 +127,7 @@ const ReportsPage: React.FC = () => {
 
   // ── Stock ──
   const [stockData, setStockData] = useState<StockStatus | null>(null);
+  const [stockDetail, setStockDetail] = useState<StockDetailItem[]>([]);
 
   const formatCLP = (n: number) =>
     '$' + Math.round(n).toLocaleString('es-CL');
@@ -174,6 +188,19 @@ const ReportsPage: React.FC = () => {
           setStockData(null);
         })
         .finally(() => setLoading(false));
+
+      // Cargar detalle completo para exportación
+      fetch(`${API}/reports/stock-detail${locParam ? `?${locParam.slice(1)}` : ''}`, { credentials: 'include' })
+        .then(async res => {
+          if (!res.ok) throw new Error(`Error ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          setStockDetail(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          setStockDetail([]);
+        });
     }
   }, [activeTab, salesPeriod, dateFrom, dateTo, selectedLocations]);
 
@@ -202,13 +229,13 @@ const ReportsPage: React.FC = () => {
       label = 'productos-top';
       columns = ['#', 'Producto', 'ID', 'Categoría', 'Vendido', 'Ventas', 'Ingresos'];
       rows = topProducts.map((p, i) => [i + 1, p.productDescription, p.productId, p.category || '', p.totalSold, p.saleCount, p.totalRevenue]);
-    } else if (activeTab === 'stock' && stockData) {
+    } else if (activeTab === 'stock' && stockDetail.length > 0) {
       label = 'stock';
-      columns = ['Producto', 'ID', 'Ubicación', 'Stock', 'Mínimo', 'Estado'];
-      rows = stockData.lowStock.map(item => [
-        item.productDescription, item.productId, item.locationName,
+      columns = ['Producto', 'ID Fábrica', 'Categoría', 'Ubicación', 'Cantidad', 'Stock Mínimo', 'Precio', 'Costo'];
+      rows = stockDetail.map(item => [
+        item.productDescription, item.factoryId, item.category || '—', item.locationName,
         item.quantity, item.minStock,
-        item.quantity === 0 ? 'Agotado' : 'Bajo'
+        formatCLP(item.price), formatCLP(item.cost)
       ]);
     }
 
@@ -246,6 +273,7 @@ const ReportsPage: React.FC = () => {
       }
       addToast(`Reporte exportado como ${format.toUpperCase()}`, 'success');
     } catch (err) {
+      console.error('Error al exportar', format, err);
       addToast('Error al exportar', 'error');
     }
   };
@@ -637,6 +665,37 @@ const ReportsPage: React.FC = () => {
               </div>
             </Card>
           </div>
+
+          {/* Inventario completo */}
+          {stockDetail.length > 0 && (
+            <Card title={`Inventario (${stockDetail.length} productos, ${stockDetail.reduce((s, i) => s + i.quantity, 0)} uds.)`} padding="none">
+              <div className="overflow-x-auto">
+                <table className="facore-table w-full">
+                  <thead>
+                    <tr><th>Producto</th><th>ID Fábrica</th><th>Categoría</th><th>Cant.</th><th>Mín.</th><th>Precio</th><th>Costo</th></tr>
+                  </thead>
+                  <tbody>
+                    {stockDetail.map(item => (
+                      <tr key={`${item.productId}-${item.locationId}`}>
+                        <td>
+                          <span className="font-medium">{item.productDescription}</span>
+                          <span className="text-xs text-text-muted ml-2">{item.productId}</span>
+                        </td>
+                        <td className="text-xs font-mono">{item.factoryId}</td>
+                        <td>{item.category || '—'}</td>
+                        <td className={`font-semibold tabular-nums ${item.quantity <= item.minStock ? 'text-brick' : ''}`}>
+                          {item.quantity}
+                        </td>
+                        <td className="text-text-muted">{item.minStock}</td>
+                        <td className="tabular-nums">{formatCLP(item.price)}</td>
+                        <td className="tabular-nums text-text-muted">{formatCLP(item.cost)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
 
           {/* Alertas */}
           {stockData.lowStock.length > 0 && (

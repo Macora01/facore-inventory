@@ -240,6 +240,59 @@ router.get(
   })
 );
 
+// ── GET /api/reports/stock-detail — Detalle completo de stock por ubicación ──
+router.get(
+  '/stock-detail',
+  requireRole('admin', 'operador', 'visita'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const pool = req.db!;
+    const locationIds = parseLocations(req.query);
+
+    let query = `
+      SELECT p.id_venta as "productId",
+             p.description as "productDescription",
+             p.id_fabrica as "factoryId",
+             p.category,
+             p.min_stock as "minStock",
+             p.price,
+             p.cost,
+             s.quantity,
+             l.name as "locationName",
+             s.location_id as "locationId"
+      FROM stock s
+      JOIN products p ON s.product_id = p.id_venta
+      JOIN locations l ON s.location_id = l.id
+      WHERE s.quantity > 0`;
+    const params: any[] = [];
+
+    if (locationIds) {
+      const base = params.length + 1;
+      const ph = locationIds.map((_, i) => `$${base + i}`).join(', ');
+      query += ` AND s.location_id IN (${ph})`;
+      params.push(...locationIds);
+    }
+
+    query += ' ORDER BY s.quantity DESC, p.description ASC';
+
+    const result = await pool.query(query, params);
+
+    const items = result.rows.map((r: any) => ({
+      productId: r.productId,
+      productDescription: r.productDescription,
+      factoryId: r.factoryId,
+      category: r.category,
+      minStock: Number(r.minStock),
+      price: Number(r.price),
+      cost: Number(r.cost),
+      quantity: Number(r.quantity),
+      locationName: r.locationName,
+      locationId: r.locationId,
+    }));
+
+    ok(res, items);
+  })
+);
+
 // ── GET /api/reports/dashboard-summary — Datos agregados para el Dashboard ──
 router.get(
   '/dashboard-summary',
