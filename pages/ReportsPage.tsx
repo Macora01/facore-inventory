@@ -100,7 +100,7 @@ const ReportsPage: React.FC = () => {
 
   const getLocationsParam = () => {
     if (selectedLocations.length === 0) return '';
-    return `&locations=${selectedLocations.join(',')}`;
+    return `&locations=${selectedLocations.map(id => encodeURIComponent(id)).join(',')}`;
   };
 
   // ── Ventas ──
@@ -123,13 +123,12 @@ const ReportsPage: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    const locs = getLocationsParam();
+    const locParam = getLocationsParam();
 
     if (activeTab === 'sales') {
       const params = new URLSearchParams({ period: salesPeriod });
       if (dateFrom) params.set('from', dateFrom);
       if (dateTo) params.set('to', dateTo);
-      const locParam = selectedLocations.length > 0 ? `&locations=${selectedLocations.join(',')}` : '';
 
       fetch(`${API}/reports/sales-summary?${params}${locParam}`, { credentials: 'include' })
         .then(async res => {
@@ -146,7 +145,6 @@ const ReportsPage: React.FC = () => {
         })
         .finally(() => setLoading(false));
     } else if (activeTab === 'products') {
-      const locParam = selectedLocations.length > 0 ? `&locations=${selectedLocations.join(',')}` : '';
       fetch(`${API}/reports/top-products?limit=15${locParam}`, { credentials: 'include' })
         .then(async res => {
           if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -162,7 +160,6 @@ const ReportsPage: React.FC = () => {
         })
         .finally(() => setLoading(false));
     } else if (activeTab === 'stock') {
-      const locParam = selectedLocations.length > 0 ? `&locations=${selectedLocations.join(',')}` : '';
       fetch(`${API}/reports/stock-status${locParam ? `?${locParam.slice(1)}` : ''}`, { credentials: 'include' })
         .then(async res => {
           if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -339,7 +336,7 @@ const ReportsPage: React.FC = () => {
                   className="w-4 h-4 rounded accent-clay"
                 />
                 <span>{loc.name}</span>
-                <span className="text-xs text-text-muted ml-auto">{loc.type}</span>
+                <span className="text-xs text-text-muted ml-auto">{loc.id}</span>
               </label>
             ))}
           </div>
