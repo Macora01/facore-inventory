@@ -251,14 +251,14 @@ const ReportsPage: React.FC = () => {
         const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
         downloadBlob(blob, `reporte-${label}-${new Date().toISOString().slice(0, 10)}.csv`);
       } else if (format === 'xlsx') {
-        const XLSX = (await import('xlsx')).default;
+        const XLSX = await import('xlsx');
         const ws = XLSX.utils.aoa_to_sheet([columns, ...rows]);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
         XLSX.writeFile(wb, `reporte-${label}-${new Date().toISOString().slice(0, 10)}.xlsx`);
       } else if (format === 'pdf') {
-        const { default: jsPDF } = await import('jspdf');
-        const { default: autoTable } = await import('jspdf-autotable');
+        const jsPDF = (await import('jspdf')).default;
+        const autoTable = (await import('jspdf-autotable')).default;
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.setFontSize(14);
         doc.text(`Reporte — ${activeTab === 'sales' ? 'Ventas' : activeTab === 'products' ? 'Top Productos' : 'Stock'}`, 14, 15);

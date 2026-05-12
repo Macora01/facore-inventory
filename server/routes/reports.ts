@@ -60,7 +60,7 @@ router.get(
       conditions.push(`m.timestamp::date <= $${params.length}`);
     }
     if (locationIds) {
-      addLocFilter(conditions, params, 'm.location_id', locationIds);
+      addLocFilter(conditions, params, 'm.from_location_id', locationIds);
     }
 
     const whereClause = conditions.join(' AND ');
@@ -104,7 +104,7 @@ router.get(
     const params: any[] = [limit];
 
     if (locationIds) {
-      addLocFilter(conditions, params, 'm.location_id', locationIds);
+      addLocFilter(conditions, params, 'm.from_location_id', locationIds);
     }
 
     const whereClause = conditions.join(' AND ');
