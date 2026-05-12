@@ -11,8 +11,21 @@ router.use(requireDb);
 function parseLocations(query: any): string[] | null {
   const raw = query.locations as string | undefined;
   if (!raw) return null;
-  const ids = raw.split(',').map(s => s.trim()).filter(Boolean);
+  const ids = raw.split(',').map((s: string) => s.trim()).filter(Boolean);
   return ids.length > 0 ? ids : null;
+}
+
+// ── Helper: agrega IN ($1, $2, ...) a partir de params.length ──
+function addLocFilter(
+  conditions: string[],
+  params: any[],
+  column: string,
+  locationIds: string[],
+): void {
+  const base = params.length + 1;
+  const placeholders = locationIds.map((_, i) => `$${base + i}`).join(', ');
+  conditions.push(`${column} IN (${placeholders})`);
+  params.push(...locationIds);
 }
 
 // ── GET /api/reports/sales-summary — Ventas agrupadas por período ──
@@ -47,8 +60,7 @@ router.get(
       conditions.push(`m.timestamp::date <= $${params.length}`);
     }
     if (locationIds) {
-      params.push(locationIds);
-      conditions.push(`m.location_id = ANY($${params.length})`);
+      addLocFilter(conditions, params, 'm.location_id', locationIds);
     }
 
     const whereClause = conditions.join(' AND ');
@@ -92,8 +104,7 @@ router.get(
     const params: any[] = [limit];
 
     if (locationIds) {
-      params.push(locationIds);
-      conditions.push(`m.location_id = ANY($${params.length})`);
+      addLocFilter(conditions, params, 'm.location_id', locationIds);
     }
 
     const whereClause = conditions.join(' AND ');
@@ -155,8 +166,10 @@ router.get(
         AND s.quantity <= p.min_stock`;
     const lowParams: any[] = [];
     if (locationIds) {
-      lowParams.push(locationIds);
-      lowQuery += ` AND s.location_id = ANY($${lowParams.length}::text[])`;
+      const base = lowParams.length + 1;
+      const ph = locationIds.map((_, i) => `$${base + i}`).join(', ');
+      lowQuery += ` AND s.location_id IN (${ph})`;
+      lowParams.push(...locationIds);
     }
     lowQuery += ' ORDER BY s.quantity ASC LIMIT 30';
     const lowStockResult = await pool.query(lowQuery, lowParams);
@@ -173,8 +186,10 @@ router.get(
       WHERE l.is_active = true`;
     const distParams: any[] = [];
     if (locationIds) {
-      distParams.push(locationIds);
-      distQuery += ` AND l.id = ANY($${distParams.length}::text[])`;
+      const base = distParams.length + 1;
+      const ph = locationIds.map((_, i) => `$${base + i}`).join(', ');
+      distQuery += ` AND l.id IN (${ph})`;
+      distParams.push(...locationIds);
     }
     distQuery += ' GROUP BY l.id, l.name, l.type ORDER BY "totalItems" DESC';
     const distributionResult = await pool.query(distQuery, distParams);
@@ -187,8 +202,10 @@ router.get(
       WHERE s.quantity > 0`;
     const totalsParams: any[] = [];
     if (locationIds) {
-      totalsParams.push(locationIds);
-      totalsQuery += ` AND s.location_id = ANY($${totalsParams.length}::text[])`;
+      const base = totalsParams.length + 1;
+      const ph = locationIds.map((_, i) => `$${base + i}`).join(', ');
+      totalsQuery += ` AND s.location_id IN (${ph})`;
+      totalsParams.push(...locationIds);
     }
     const totalsResult = await pool.query(totalsQuery, totalsParams);
 
