@@ -7,6 +7,14 @@ import { ok } from '../lib/response.js';
 const router = Router();
 router.use(requireDb);
 
+// ── Helper: parsea ?locations=a,b,c → string[] ──
+function parseLocations(query: any): string[] | null {
+  const raw = query.locations as string | undefined;
+  if (!raw) return null;
+  const ids = raw.split(',').map(s => s.trim()).filter(Boolean);
+  return ids.length > 0 ? ids : null;
+}
+
 // ── GET /api/reports/sales-summary — Ventas agrupadas por período ──
 router.get(
   '/sales-summary',
@@ -16,6 +24,7 @@ router.get(
     const period = (req.query.period as string) || 'day';
     const dateFrom = req.query.from as string | undefined;
     const dateTo = req.query.to as string | undefined;
+    const locationIds = parseLocations(req.query);
 
     let dateFormat: string;
     if (period === 'month') {
@@ -36,6 +45,10 @@ router.get(
     if (dateTo) {
       params.push(dateTo);
       conditions.push(`m.timestamp::date <= $${params.length}`);
+    }
+    if (locationIds) {
+      params.push(locationIds);
+      conditions.push(`m.location_id = ANY($${params.length})`);
     }
 
     const whereClause = conditions.join(' AND ');
@@ -73,6 +86,17 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const pool = req.db!;
     const limit = parseInt((req.query.limit as string) || '15', 10);
+    const locationIds = parseLocations(req.query);
+
+    const conditions: string[] = ["m.type = 'SALE'"];
+    const params: any[] = [limit];
+
+    if (locationIds) {
+      params.push(locationIds);
+      conditions.push(`m.location_id = ANY($${params.length})`);
+    }
+
+    const whereClause = conditions.join(' AND ');
 
     const result = await pool.query(
       `SELECT m.product_id as "productId",
@@ -84,11 +108,11 @@ router.get(
               COUNT(*)::int as "saleCount"
        FROM movements m
        JOIN products p ON m.product_id = p.id_venta
-       WHERE m.type = 'SALE'
+       WHERE ${whereClause}
        GROUP BY m.product_id, p.description, p.id_fabrica, p.category
        ORDER BY "totalSold" DESC
        LIMIT $1`,
-      [limit]
+      params
     );
 
     const products = result.rows.map((r: any) => ({
@@ -111,9 +135,10 @@ router.get(
   requireRole('admin', 'operador', 'visita'),
   asyncHandler(async (req: Request, res: Response) => {
     const pool = req.db!;
+    const locationIds = parseLocations(req.query);
 
     // ── Productos bajo stock mínimo ──
-    const lowStockResult = await pool.query(`
+    let lowQuery = `
       SELECT p.id_venta as "productId",
              p.description as "productDescription",
              p.id_fabrica as "factoryId",
@@ -127,13 +152,17 @@ router.get(
       JOIN stock s ON p.id_venta = s.product_id
       JOIN locations l ON s.location_id = l.id
       WHERE s.quantity > 0
-        AND s.quantity <= p.min_stock
-      ORDER BY s.quantity ASC
-      LIMIT 30
-    `);
+        AND s.quantity <= p.min_stock`;
+    const lowParams: any[] = [];
+    if (locationIds) {
+      lowParams.push(locationIds);
+      lowQuery += ` AND s.location_id = ANY($${lowParams.length}::text[])`;
+    }
+    lowQuery += ' ORDER BY s.quantity ASC LIMIT 30';
+    const lowStockResult = await pool.query(lowQuery, lowParams);
 
     // ── Distribución por ubicación ──
-    const distributionResult = await pool.query(`
+    let distQuery = `
       SELECT l.id as "locationId",
              l.name as "locationName",
              l.type as "locationType",
@@ -141,18 +170,27 @@ router.get(
              COALESCE(SUM(s.quantity), 0) as "totalItems"
       FROM locations l
       LEFT JOIN stock s ON l.id = s.location_id AND s.quantity > 0
-      WHERE l.is_active = true
-      GROUP BY l.id, l.name, l.type
-      ORDER BY "totalItems" DESC
-    `);
+      WHERE l.is_active = true`;
+    const distParams: any[] = [];
+    if (locationIds) {
+      distParams.push(locationIds);
+      distQuery += ` AND l.id = ANY($${distParams.length}::text[])`;
+    }
+    distQuery += ' GROUP BY l.id, l.name, l.type ORDER BY "totalItems" DESC';
+    const distributionResult = await pool.query(distQuery, distParams);
 
     // ── Totales generales ──
-    const totalsResult = await pool.query(`
+    let totalsQuery = `
       SELECT COUNT(DISTINCT s.product_id)::int as "productsWithStock",
              COALESCE(SUM(s.quantity), 0) as "grandTotal"
       FROM stock s
-      WHERE s.quantity > 0
-    `);
+      WHERE s.quantity > 0`;
+    const totalsParams: any[] = [];
+    if (locationIds) {
+      totalsParams.push(locationIds);
+      totalsQuery += ` AND s.location_id = ANY($${totalsParams.length}::text[])`;
+    }
+    const totalsResult = await pool.query(totalsQuery, totalsParams);
 
     const lowStock = lowStockResult.rows.map((r: any) => ({
       productId: r.productId,

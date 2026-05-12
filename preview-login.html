@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facore Inventory — Login Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #FAFAF8;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.container {
+  width: 100%;
+  max-width: 384px;
+  padding: 24px;
+}
+.logo-section {
+  text-align: center;
+  margin-bottom: 40px;
+}
+.logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: #7D6B5C;
+  color: white;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(44,37,32,0.06), 0 1px 2px rgba(44,37,32,0.04);
+}
+.logo-icon span {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.04em;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1C1C1C;
+  letter-spacing: -0.02em;
+}
+.subtitle {
+  font-size: 11px;
+  color: #9E9E9E;
+  margin-top: 8px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid #E8E4E0;
+  box-shadow: 0 4px 12px rgba(44,37,32,0.08), 0 2px 4px rgba(44,37,32,0.04);
+  overflow: hidden;
+}
+.form {
+  padding: 32px;
+}
+.field { margin-bottom: 20px; }
+.field:last-of-type { margin-bottom: 0; }
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6E6E6E;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+.input-wrap {
+  position: relative;
+}
+.input-wrap svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9E9E9E;
+  pointer-events: none;
+}
+input {
+  width: 100%;
+  padding: 10px 12px 10px 40px;
+  border: 1px solid #E8E4E0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1C1C1C;
+  font-family: 'Inter', sans-serif;
+  background: #FFFFFF;
+  transition: all 0.15s;
+  outline: none;
+}
+input::placeholder { color: #9E9E9E; }
+input:focus { border-color: #7D6B5C; box-shadow: 0 0 0 1px rgba(125,107,92,0.2); }
+.btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #7D6B5C;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'Inter', sans-serif;
+  margin-top: 24px;
+}
+.btn:hover { background: #5C4A3E; }
+.btn:active { transform: scale(0.98); }
+.footer {
+  padding: 16px 32px;
+  background: #FAFAF8;
+  border-top: 1px solid #E8E4E0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer span {
+  font-size: 10px;
+  color: #9E9E9E;
+}
+.footer .version {
+  font-family: 'SF Mono', 'JetBrains Mono', monospace;
+  letter-spacing: 0.08em;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo-section">
+    <div class="logo-icon"><span>F</span></div>
+    <h1>Facore Inventory</h1>
+    <p class="subtitle">Gestión de Inventario</p>
+  </div>
+  <div class="card">
+    <form class="form">
+      <div class="field">
+        <label>Usuario</label>
+        <div class="input-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <input type="text" placeholder="Ingresa tu usuario" value="admin">
+        </div>
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <div class="input-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input type="password" placeholder="••••••••" value="admin123">
+        </div>
+      </div>
+      <button type="submit" class="btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Entrar
+      </button>
+    </form>
+    <div class="footer">
+      <span class="version">v2.0.0</span>
+      <span>Facore &copy; 2026</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

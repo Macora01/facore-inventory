@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useApp } from '../context/AppContext';
 import { useToast } from '../hooks/useToast';
 import Card from '../components/Card';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { TrendingUp, Package, AlertTriangle, MapPin, Download } from 'lucide-react';
+import { TrendingUp, Package, AlertTriangle, MapPin, Download, ChevronDown, X } from 'lucide-react';
 
 const API = '/api';
 
@@ -62,9 +63,45 @@ type Tab = 'sales' | 'products' | 'stock';
 
 const ReportsPage: React.FC = () => {
   const { addToast } = useToast();
+  const { locations } = useApp();
   const [activeTab, setActiveTab] = useState<Tab>('sales');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Filtro de ubicación ──
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
+  const locDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    if (!locationDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (locDropdownRef.current && !locDropdownRef.current.contains(e.target as Node)) {
+        setLocationDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [locationDropdownOpen]);
+
+  const allLocationsSelected = selectedLocations.length === 0;
+
+  const toggleLocation = (id: string) => {
+    setSelectedLocations(prev => {
+      if (id === '__all__') return [];
+      if (prev.includes(id)) {
+        const next = prev.filter(l => l !== id);
+        return next.length === 0 ? [] : next; // si se vacía → todas
+      }
+      return [...prev, id];
+    });
+  };
+
+  const getLocationsParam = () => {
+    if (selectedLocations.length === 0) return '';
+    return `&locations=${selectedLocations.join(',')}`;
+  };
 
   // ── Ventas ──
   const [salesPeriod, setSalesPeriod] = useState<'day' | 'week' | 'month'>('day');
@@ -86,12 +123,15 @@ const ReportsPage: React.FC = () => {
     setLoading(true);
     setError(null);
 
+    const locs = getLocationsParam();
+
     if (activeTab === 'sales') {
       const params = new URLSearchParams({ period: salesPeriod });
       if (dateFrom) params.set('from', dateFrom);
       if (dateTo) params.set('to', dateTo);
+      const locParam = selectedLocations.length > 0 ? `&locations=${selectedLocations.join(',')}` : '';
 
-      fetch(`${API}/reports/sales-summary?${params}`, { credentials: 'include' })
+      fetch(`${API}/reports/sales-summary?${params}${locParam}`, { credentials: 'include' })
         .then(async res => {
           if (!res.ok) throw new Error(`Error ${res.status}`);
           return res.json();
@@ -106,7 +146,8 @@ const ReportsPage: React.FC = () => {
         })
         .finally(() => setLoading(false));
     } else if (activeTab === 'products') {
-      fetch(`${API}/reports/top-products?limit=15`, { credentials: 'include' })
+      const locParam = selectedLocations.length > 0 ? `&locations=${selectedLocations.join(',')}` : '';
+      fetch(`${API}/reports/top-products?limit=15${locParam}`, { credentials: 'include' })
         .then(async res => {
           if (!res.ok) throw new Error(`Error ${res.status}`);
           return res.json();
@@ -121,7 +162,8 @@ const ReportsPage: React.FC = () => {
         })
         .finally(() => setLoading(false));
     } else if (activeTab === 'stock') {
-      fetch(`${API}/reports/stock-status`, { credentials: 'include' })
+      const locParam = selectedLocations.length > 0 ? `&locations=${selectedLocations.join(',')}` : '';
+      fetch(`${API}/reports/stock-status${locParam ? `?${locParam.slice(1)}` : ''}`, { credentials: 'include' })
         .then(async res => {
           if (!res.ok) throw new Error(`Error ${res.status}`);
           return res.json();
@@ -136,7 +178,7 @@ const ReportsPage: React.FC = () => {
         })
         .finally(() => setLoading(false));
     }
-  }, [activeTab, salesPeriod, dateFrom, dateTo]);
+  }, [activeTab, salesPeriod, dateFrom, dateTo, selectedLocations]);
 
   // ── Totales de ventas ──
   const salesTotals = salesData.reduce(
@@ -243,6 +285,62 @@ const ReportsPage: React.FC = () => {
                 <Download size={14} />
                 {fmt.toUpperCase()}
               </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Selector de ubicación ── */}
+      <div className="relative" ref={locDropdownRef}>
+        <button
+          onClick={() => setLocationDropdownOpen(!locationDropdownOpen)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface border border-border
+                     text-sm text-text hover:border-clay/30 transition-colors min-h-[40px]"
+        >
+          <div className="text-text-muted"><MapPin size={16} /></div>
+          <span>
+            {allLocationsSelected
+              ? 'Todas las ubicaciones'
+              : selectedLocations.length === 1
+                ? locations.find(l => l.id === selectedLocations[0])?.name || selectedLocations[0]
+                : `${selectedLocations.length} ubicaciones`}
+          </span>
+          <ChevronDown size={14} className={`text-text-muted transition-transform ${locationDropdownOpen ? 'rotate-180' : ''}`} />
+          {!allLocationsSelected && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setSelectedLocations([]); }}
+              className="ml-1 p-0.5 rounded hover:bg-brick/10 text-text-muted hover:text-brick"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </button>
+
+        {locationDropdownOpen && (
+          <div className="absolute top-full left-0 mt-1 w-64 bg-surface border border-border
+                          rounded-xl shadow-lg z-50 max-h-64 overflow-y-auto py-1">
+            <label className="flex items-center gap-2 px-4 py-2.5 hover:bg-canvas cursor-pointer
+                              text-sm font-medium border-b border-border">
+              <input
+                type="checkbox"
+                checked={allLocationsSelected}
+                onChange={() => toggleLocation('__all__')}
+                className="w-4 h-4 rounded accent-clay"
+              />
+              Todas
+            </label>
+            {locations.filter(l => l.isActive !== false).map(loc => (
+              <label key={loc.id}
+                className="flex items-center gap-2 px-4 py-2.5 hover:bg-canvas cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={selectedLocations.includes(loc.id)}
+                  onChange={() => toggleLocation(loc.id)}
+                  className="w-4 h-4 rounded accent-clay"
+                />
+                <span>{loc.name}</span>
+                <span className="text-xs text-text-muted ml-auto">{loc.type}</span>
+              </label>
             ))}
           </div>
         )}
