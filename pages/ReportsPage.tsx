@@ -227,13 +227,13 @@ const ReportsPage: React.FC = () => {
       rows = salesData.map(s => [s.period, s.totalSales, s.totalQuantity, s.totalRevenue, s.totalCost, s.margin]);
     } else if (activeTab === 'products') {
       label = 'productos-top';
-      columns = ['#', 'Producto', 'ID', 'Categoría', 'Vendido', 'Ventas', 'Ingresos'];
+      columns = ['#', 'Producto', 'Código', 'Categoría', 'Vendido', 'Ventas', 'Ingresos'];
       rows = topProducts.map((p, i) => [i + 1, p.productDescription, p.productId, p.category || '', p.totalSold, p.saleCount, p.totalRevenue]);
     } else if (activeTab === 'stock' && stockDetail.length > 0) {
       label = 'stock';
-      columns = ['Producto', 'ID Fábrica', 'Categoría', 'Ubicación', 'Cantidad', 'Stock Mínimo', 'Precio', 'Costo'];
+      columns = ['Producto', 'Código', 'ID Fábrica', 'Categoría', 'Ubicación', 'Cantidad', 'Stock Mínimo', 'Precio', 'Costo'];
       rows = stockDetail.map(item => [
-        item.productDescription, item.factoryId, item.category || '—', item.locationName,
+        item.productDescription, item.productId, item.factoryId, item.category || '—', item.locationName,
         item.quantity, item.minStock,
         formatCLP(item.price), formatCLP(item.cost)
       ]);
@@ -570,7 +570,7 @@ const ReportsPage: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="facore-table w-full">
                   <thead>
-                    <tr><th>#</th><th>Producto</th><th>Categoría</th><th>Vendido</th><th>Ventas</th><th>Ingresos</th></tr>
+                    <tr><th>#</th><th>Producto</th><th>Código</th><th>Categoría</th><th>Vendido</th><th>Ventas</th><th>Ingresos</th></tr>
                   </thead>
                   <tbody>
                     {topProducts.map((p, i) => (
@@ -578,8 +578,8 @@ const ReportsPage: React.FC = () => {
                         <td className="font-semibold text-text-muted">{i + 1}</td>
                         <td>
                           <span className="font-medium">{p.productDescription}</span>
-                          <span className="text-xs text-text-muted ml-2">{p.productId}</span>
                         </td>
+                        <td className="text-xs font-mono">{p.productId}</td>
                         <td>{p.category || '—'}</td>
                         <td className="font-semibold">{p.totalSold}</td>
                         <td>{p.saleCount}</td>
@@ -672,15 +672,15 @@ const ReportsPage: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="facore-table w-full">
                   <thead>
-                    <tr><th>Producto</th><th>ID Fábrica</th><th>Categoría</th><th>Cant.</th><th>Mín.</th><th>Precio</th><th>Costo</th></tr>
+                    <tr><th>Producto</th><th>Código</th><th>ID Fábrica</th><th>Categoría</th><th>Cant.</th><th>Mín.</th><th>Precio</th><th>Costo</th></tr>
                   </thead>
                   <tbody>
                     {stockDetail.map(item => (
                       <tr key={`${item.productId}-${item.locationId}`}>
                         <td>
                           <span className="font-medium">{item.productDescription}</span>
-                          <span className="text-xs text-text-muted ml-2">{item.productId}</span>
                         </td>
+                        <td className="text-xs font-mono">{item.productId}</td>
                         <td className="text-xs font-mono">{item.factoryId}</td>
                         <td>{item.category || '—'}</td>
                         <td className={`font-semibold tabular-nums ${item.quantity <= item.minStock ? 'text-brick' : ''}`}>
@@ -703,15 +703,15 @@ const ReportsPage: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="facore-table w-full">
                   <thead>
-                    <tr><th>Producto</th><th>Ubicación</th><th>Stock</th><th>Mínimo</th><th>Estado</th></tr>
+                    <tr><th>Producto</th><th>Código</th><th>Ubicación</th><th>Stock</th><th>Mínimo</th><th>Estado</th></tr>
                   </thead>
                   <tbody>
                     {stockData.lowStock.map(item => (
                       <tr key={`${item.productId}-${item.locationId}`}>
                         <td>
                           <span className="font-medium">{item.productDescription}</span>
-                          <span className="text-xs text-text-muted ml-2">{item.productId}</span>
                         </td>
+                        <td className="text-xs font-mono">{item.productId}</td>
                         <td>{item.locationName}</td>
                         <td className="font-semibold text-brick">{item.quantity}</td>
                         <td>{item.minStock}</td>
