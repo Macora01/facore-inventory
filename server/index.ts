@@ -256,6 +256,24 @@ async function startServer() {
     ok(res, { transfersFixed: fixed, bazvltNonZero: v.rows[0].c });
   }));
 
+  // ── POST /api/emergency/deduct-sales-from-bodcent ──
+  app.post('/api/emergency/deduct-sales-from-bodcent', asyncHandler(async (req: Request, res: Response) => {
+    const p = getPool();
+    if (!p) return fail(res, 'DB no disponible', 503);
+    const r = await p.query(`
+      UPDATE stock s SET quantity = s.quantity - m.sold, updated_at = NOW()
+      FROM (
+        SELECT product_id, SUM(quantity)::int as sold
+        FROM movements
+        WHERE type = 'SALE' AND from_location_id = 'BAZVLT'
+        GROUP BY product_id
+      ) m
+      WHERE s.product_id = m.product_id AND s.location_id = 'BODCENT'
+      RETURNING s.product_id, s.quantity
+    `);
+    ok(res, { deducted: r.rowCount, products: r.rows });
+  }));
+
   // ── Error handler global (debe ir después de las rutas) ──
   app.use(globalErrorHandler);
 
