@@ -206,6 +206,56 @@ async function startServer() {
     ok(res, { reset: v.rows[0].c, message: 'BAZVLT stock → 0' });
   }));
 
+  // ── POST /api/emergency/fix-bazvlt-transfers ──
+  app.post('/api/emergency/fix-bazvlt-transfers', asyncHandler(async (req: Request, res: Response) => {
+    const p = getPool();
+    if (!p) return fail(res, 'DB no disponible', 503);
+    // Buscar TRANSFER_OUT de BODCENT a BAZVLT que no tengan TRANSFER_IN
+    const missing = await p.query(`
+      SELECT DISTINCT o.product_id, o.quantity, o.timestamp, o.created_by, o.id as out_id
+      FROM movements o
+      WHERE o.type = 'TRANSFER_OUT'
+        AND o.from_location_id = 'BODCENT'
+        AND o.to_location_id = 'BAZVLT'
+        AND NOT EXISTS (
+          SELECT 1 FROM movements i
+          WHERE i.type = 'TRANSFER_IN'
+            AND i.product_id = o.product_id
+            AND i.from_location_id = 'BODCENT'
+            AND i.to_location_id = 'BAZVLT'
+            AND i.quantity = o.quantity
+        )
+    `);
+    let fixed = 0;
+    for (const row of missing.rows) {
+      const movId = `mov-${Date.now()}-${fixed}-fix-in`;
+      await p.query(
+        `INSERT INTO movements (id, product_id, from_location_id, to_location_id, quantity, type, timestamp, created_by)
+         VALUES ($1, $2, 'BODCENT', 'BAZVLT', $3, 'TRANSFER_IN', $4, $5)`,
+        [movId, row.product_id, row.quantity, row.timestamp, row.created_by || 'admin']
+      );
+      await p.query(
+        `INSERT INTO stock (product_id, location_id, quantity) VALUES ($1, 'BAZVLT', $2)
+         ON CONFLICT (product_id, location_id) DO UPDATE SET quantity = stock.quantity + $2, updated_at = NOW()`,
+        [row.product_id, row.quantity]
+      );
+      fixed++;
+    }
+    // Descontar ventas ya registradas en BAZVLT
+    await p.query(`
+      UPDATE stock s SET quantity = s.quantity - m.sold, updated_at = NOW()
+      FROM (
+        SELECT product_id, SUM(quantity)::int as sold
+        FROM movements
+        WHERE type = 'SALE' AND from_location_id = 'BAZVLT'
+        GROUP BY product_id
+      ) m
+      WHERE s.product_id = m.product_id AND s.location_id = 'BAZVLT'
+    `);
+    const v = await p.query(`SELECT COUNT(*)::int as c FROM stock WHERE location_id='BAZVLT' AND quantity != 0`);
+    ok(res, { transfersFixed: fixed, bazvltNonZero: v.rows[0].c });
+  }));
+
   // ── Error handler global (debe ir después de las rutas) ──
   app.use(globalErrorHandler);
 
