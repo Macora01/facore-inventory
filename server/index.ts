@@ -129,36 +129,43 @@ async function startServer() {
       'BI6615BD','BI6630BG','BI6628MG','BI6628FG','BI6644FG','BI6646BL','BI6646MG',
       'BI6666NG','BI6713MG'
     ];
-    const ok_ids: string[] = [];
-    const errors: string[] = [];
 
-    // Primero verificar qué IDs existen en products
-    const prodResult = await p.query(`SELECT id_venta FROM products WHERE id_venta = ANY($1)`, [ids]);
-    const existingIds = new Set(prodResult.rows.map((r: any) => r.id_venta));
+    // Una sola query: insertar todo, solo los IDs que existen en products
+    const r = await p.query(`
+      INSERT INTO stock (product_id, location_id, quantity)
+      SELECT id_venta, 'BAZVLT', 1
+      FROM products
+      WHERE id_venta = ANY($1)
+      ON CONFLICT (product_id, location_id)
+      DO UPDATE SET quantity = stock.quantity + 1, updated_at = NOW()
+      RETURNING product_id
+    `, [ids]);
 
-    for (const id of ids) {
-      if (!existingIds.has(id)) {
-        errors.push(`${id}: no existe en products`);
-        continue;
-      }
-      try {
-        const r = await p.query(
-          `INSERT INTO stock (product_id, location_id, quantity) VALUES ($1, 'BAZVLT', 1)
-           ON CONFLICT (product_id, location_id) DO UPDATE SET quantity = stock.quantity + 1, updated_at = NOW()`,
-          [id]
-        );
-        ok_ids.push(id);
-      } catch (e: any) {
-        errors.push(`${id}: ${e.message}`);
-      }
-    }
-
-    // Verificar cuántos hay ahora
-    const verify = await p.query(`SELECT COUNT(*)::int as c FROM stock WHERE location_id='BAZVLT' AND quantity > 0`);
+    // Verificar
+    const v = await p.query(`SELECT COUNT(*)::int as c FROM stock WHERE location_id='BAZVLT' AND quantity > 0`);
     ok(res, {
-      restored: ok_ids.length,
-      totalInBAZVLT: verify.rows[0].c,
-      errors: errors.slice(0, 10)
+      inserted: r.rowCount,
+      totalInBAZVLT: v.rows[0].c,
+      ids: r.rows.map((row: any) => row.product_id)
+    });
+  }));
+
+  // ── POST /api/emergency/check-bazvlt ──
+  app.post('/api/emergency/check-bazvlt', asyncHandler(async (req: Request, res: Response) => {
+    const p = getPool();
+    if (!p) return fail(res, 'DB no disponible', 503);
+    // Insertar un producto de prueba y verificar
+    const testId = 'BI6692MG';
+    const before = await p.query(`SELECT * FROM stock WHERE product_id=$1 AND location_id='BAZVLT'`, [testId]);
+    await p.query(`INSERT INTO stock (product_id, location_id, quantity) VALUES ($1, 'BAZVLT', 1) ON CONFLICT (product_id, location_id) DO UPDATE SET quantity = stock.quantity + 1, updated_at = NOW()`, [testId]);
+    const after = await p.query(`SELECT * FROM stock WHERE product_id=$1 AND location_id='BAZVLT'`, [testId]);
+    const all = await p.query(`SELECT product_id, quantity FROM stock WHERE location_id='BAZVLT' LIMIT 5`);
+    ok(res, {
+      testProduct: testId,
+      before: before.rows[0] || null,
+      after: after.rows[0] || null,
+      first5: all.rows,
+      totalRows: (await p.query(`SELECT COUNT(*)::int as c FROM stock WHERE location_id='BAZVLT'`)).rows[0].c
     });
   }));
 
