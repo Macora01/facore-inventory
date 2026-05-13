@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs/promises';
 import cookieParser from 'cookie-parser';
+import { APP_VERSION } from '../version.js';
 import { fileURLToPath } from 'url';
 
 import { initDb, getPool } from './config/database.js';
@@ -65,7 +66,7 @@ async function startServer() {
       try { await pool.query('SELECT 1'); dbStatus = 'connected'; }
       catch { dbStatus = 'error'; }
     }
-    res.json({ status: 'ok', database: dbStatus, version: '2.0.0' });
+    res.json({ status: 'ok', database: dbStatus, version: APP_VERSION });
   });
 
   app.use('/api/auth', authRoutes);
