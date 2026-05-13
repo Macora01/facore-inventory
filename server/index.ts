@@ -178,6 +178,25 @@ async function startServer() {
     });
   }));
 
+  // ── POST /api/emergency/reconcile-bazvlt-stock ──
+  app.post('/api/emergency/reconcile-bazvlt-stock', asyncHandler(async (req: Request, res: Response) => {
+    const p = getPool();
+    if (!p) return fail(res, 'DB no disponible', 503);
+    // Descontar del stock todas las ventas registradas en BAZVLT
+    await p.query(`
+      UPDATE stock s SET quantity = s.quantity - m.sold, updated_at = NOW()
+      FROM (
+        SELECT product_id, SUM(quantity)::int as sold
+        FROM movements
+        WHERE type = 'SALE' AND from_location_id = 'BAZVLT'
+        GROUP BY product_id
+      ) m
+      WHERE s.product_id = m.product_id AND s.location_id = 'BAZVLT'
+    `);
+    const v = await p.query(`SELECT product_id, quantity FROM stock WHERE location_id='BAZVLT' AND quantity != 0`);
+    ok(res, { reconciled: v.rowCount, stock: v.rows });
+  }));
+
   // ── Error handler global (debe ir después de las rutas) ──
   app.use(globalErrorHandler);
 
