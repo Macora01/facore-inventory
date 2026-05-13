@@ -265,6 +265,10 @@ router.post('/sales', requireRole('admin', 'operador'), asyncHandler(async (req:
         errors.push(`Fila ${count + 1}: falta código o ubicación`); continue;
       }
 
+      // Obtener costo del producto
+      const prod = await pool.query('SELECT cost FROM products WHERE id_venta = $1', [idVenta]);
+      const cost = prod.rows[0]?.cost ? parseFloat(prod.rows[0].cost) : 0;
+
       const saleId = `sale-bulk-${Date.now()}-${count}`;
       const client = await pool.connect();
       try {
@@ -275,9 +279,9 @@ router.post('/sales', requireRole('admin', 'operador'), asyncHandler(async (req:
           [saleId, idVenta, locationId, qty, price]
         );
         await client.query(
-          `INSERT INTO movements (id, product_id, from_location_id, quantity, type, timestamp, price, created_by)
-           VALUES ($1, $2, $3, $4, 'SALE', $5, $6, $7)`,
-          [`mov-sale-bulk-${Date.now()}-${count}`, idVenta, locationId, qty, timestamp, price, req.user!.username]
+          `INSERT INTO movements (id, product_id, from_location_id, quantity, type, timestamp, price, cost, created_by)
+           VALUES ($1, $2, $3, $4, 'SALE', $5, $6, $7, $8)`,
+          [`mov-sale-bulk-${Date.now()}-${count}`, idVenta, locationId, qty, timestamp, price, cost, req.user!.username]
         );
         await client.query(
           `UPDATE stock SET quantity = quantity - $1, updated_at = NOW() WHERE product_id = $2 AND location_id = $3`,

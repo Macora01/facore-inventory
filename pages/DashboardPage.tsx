@@ -194,8 +194,8 @@ const DashboardPage: React.FC = () => {
           const metrics: [string, string, string, React.FC<{ size?: number }>, string, string][] = [
             ['Ingresos 30d', formatCLP(data.revenue30d), 'c/IVA · s/IVA: ' + formatCLP(data.revenueNeto), DollarSign, 'text-sage', 'bg-sage/5 border-sage/10'],
             ['Costo Inventario', formatCLP(data.inventoryCost), 'Valor venta: ' + formatCLP(data.inventoryValue), BarChart3, 'text-clay', 'bg-clay/5 border-clay/10'],
-            ['Margen Bruto', formatCLP(data.margin30d), data.marginPercent + '% (c/IVA)', TrendingUp, data.margin30d >= 0 ? 'text-amber' : 'text-brick',
-             data.margin30d >= 0 ? 'bg-amber/5 border-amber/15' : 'bg-brick/5 border-brick/15'],
+            ['Margen Bruto', formatCLP(data.marginNeto), data.marginNetoPercent + '% (s/IVA)', TrendingUp, data.marginNeto >= 0 ? 'text-amber' : 'text-brick',
+             data.marginNeto >= 0 ? 'bg-amber/5 border-amber/15' : 'bg-brick/5 border-brick/15'],
             ['Margen Neto', formatCLP(data.marginNeto), data.marginNetoPercent + '% (s/IVA 19%)', TrendingUp, data.marginNeto >= 0 ? 'text-clay' : 'text-brick',
              data.marginNeto >= 0 ? 'bg-clay/5 border-clay/10' : 'bg-brick/5 border-brick/15'],
           ];
