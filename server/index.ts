@@ -119,6 +119,15 @@ async function startServer() {
     ok(res, { movementsDeleted: r1.rowCount, pendingSalesDeleted: r2.rowCount });
   }));
 
+  // ── POST /api/emergency/delete-corrupt-sales ──
+  app.post('/api/emergency/delete-corrupt-sales', asyncHandler(async (req: Request, res: Response) => {
+    const p = getPool();
+    if (!p) return fail(res, 'DB no disponible', 503);
+    // Borra ventas con timestamp corrupto (año > 4000 o que empiezan con +)
+    const r = await p.query("DELETE FROM movements WHERE type='SALE' AND (timestamp::text LIKE '+%' OR extract(year from timestamp) > 4000) RETURNING id, product_id, from_location_id");
+    ok(res, { deleted: r.rowCount, ids: r.rows });
+  }));
+
   // ── POST /api/emergency/restore-bazvlt-stock ──
   app.post('/api/emergency/restore-bazvlt-stock', asyncHandler(async (req: Request, res: Response) => {
     const p = getPool();
