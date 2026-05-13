@@ -119,6 +119,28 @@ async function startServer() {
     ok(res, { movementsDeleted: r1.rowCount, pendingSalesDeleted: r2.rowCount });
   }));
 
+  // ── POST /api/emergency/restore-bazvlt-stock ──
+  app.post('/api/emergency/restore-bazvlt-stock', asyncHandler(async (req: Request, res: Response) => {
+    const p = getPool();
+    if (!p) return fail(res, 'DB no disponible', 503);
+    const ids = [
+      'BI6692MG','BI6675CL','BI6639BD','BI6639BL','BI6639MG','BI6638MG','BI6638MR',
+      'BI6635BG','BI6658BG','BI6627BD','BI6619NG','BI6618MG','BI6665BG','BI6622CL',
+      'BI6615BD','BI6630BG','BI6628MG','BI6628FG','BI6644FG','BI6646BL','BI6646MG',
+      'BI6666NG','BI6713MG'
+    ];
+    let count = 0;
+    for (const id of ids) {
+      await p.query(
+        `INSERT INTO stock (product_id, location_id, quantity) VALUES ($1, 'BAZVLT', 1)
+         ON CONFLICT (product_id, location_id) DO UPDATE SET quantity = stock.quantity + 1, updated_at = NOW()`,
+        [id]
+      );
+      count++;
+    }
+    ok(res, { restored: count, location: 'BAZVLT' });
+  }));
+
   // ── Error handler global (debe ir después de las rutas) ──
   app.use(globalErrorHandler);
 
