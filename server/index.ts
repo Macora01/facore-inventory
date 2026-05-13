@@ -114,7 +114,7 @@ async function startServer() {
   app.post('/api/emergency/delete-bazvlt-sales', asyncHandler(async (req: Request, res: Response) => {
     const p = getPool();
     if (!p) return fail(res, 'DB no disponible', 503);
-    const r1 = await p.query("DELETE FROM movements WHERE type='SALE' AND from_location_id='BAZVLT' AND timestamp LIKE '195%'");
+    const r1 = await p.query("DELETE FROM movements WHERE type='SALE' AND from_location_id='BAZVLT'");
     const r2 = await p.query("DELETE FROM pending_sales WHERE location_id='BAZVLT'");
     ok(res, { movementsDeleted: r1.rowCount, pendingSalesDeleted: r2.rowCount });
   }));
