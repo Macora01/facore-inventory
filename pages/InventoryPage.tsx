@@ -39,7 +39,7 @@ const InventoryPage: React.FC = () => {
 
     stock.forEach(s => {
       if (!map[s.productId]) map[s.productId] = { total: 0, byLocation: [] };
-      map[s.productId].total += s.quantity;
+      map[s.productId].total += Number(s.quantity);
       const loc = locations.find(l => l.id === s.locationId);
       map[s.productId].byLocation.push({
         locId: s.locationId,
