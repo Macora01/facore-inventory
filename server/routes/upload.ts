@@ -24,6 +24,33 @@ function parseCSV(text: string): any[] {
   return Papa.parse(text, { header: true, skipEmptyLines: true, delimiter: ',' }).data as any[];
 }
 
+/** Convierte fecha chilena (dd-mm-aa) o ISO a ISO 8601 */
+function parseTimestamp(raw: string | undefined): string {
+  if (!raw) return new Date().toISOString();
+  const s = String(raw).trim();
+  if (!s) return new Date().toISOString();
+
+  // Si ya es ISO (contiene T o Z, o empieza con 4 dígitos-año)
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s).toISOString();
+
+  // Formato chileno: dd-mm-aa, dd-mm-aaaa, dd/mm/aa, dd/mm/aaaa
+  const m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/);
+  if (m) {
+    const day = parseInt(m[1], 10);
+    const month = parseInt(m[2], 10) - 1; // JS: 0-indexed
+    let year = parseInt(m[3], 10);
+    if (year < 100) year += 2000; // aa → aaaa
+    const d = new Date(year, month, day);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  }
+
+  // Último intento: parse nativo
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString();
+
+  return new Date().toISOString();
+}
+
 /** Parsear XLSX (base64 o buffer) a array de objetos */
 function parseXLSX(input: string): any[] {
   const workbook = XLSX.read(input, { type: 'base64' });
@@ -216,7 +243,7 @@ router.post('/sales', requireRole('admin', 'operador'), asyncHandler(async (req:
       const locationId = row.lugar || row.location_id || row.ubicacion;
       const price = parseFloat(row.precio || row.price || '0');
       const qty = parseInt(row.qty || row.cantidad || '1');
-      const timestamp = row.timestamp || row.fecha || new Date().toISOString();
+      const timestamp = parseTimestamp(row.timestamp || row.fecha);
 
       if (!idVenta || !locationId) {
         errors.push(`Fila ${count + 1}: falta código o ubicación`); continue;
