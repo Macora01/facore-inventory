@@ -197,6 +197,15 @@ async function startServer() {
     ok(res, { reconciled: v.rowCount, stock: v.rows });
   }));
 
+  // ── POST /api/emergency/reset-bazvlt-stock ──
+  app.post('/api/emergency/reset-bazvlt-stock', asyncHandler(async (req: Request, res: Response) => {
+    const p = getPool();
+    if (!p) return fail(res, 'DB no disponible', 503);
+    await p.query(`UPDATE stock SET quantity = 0, updated_at = NOW() WHERE location_id = 'BAZVLT'`);
+    const v = await p.query(`SELECT COUNT(*)::int as c FROM stock WHERE location_id='BAZVLT'`);
+    ok(res, { reset: v.rows[0].c, message: 'BAZVLT stock → 0' });
+  }));
+
   // ── Error handler global (debe ir después de las rutas) ──
   app.use(globalErrorHandler);
 
