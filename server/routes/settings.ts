@@ -105,8 +105,22 @@ router.post('/restore', requireRole('admin'), asyncHandler(async (req: Request, 
   ok(res, { message: 'Base de datos restaurada' });
 }));
 
+// ── Target → tablas a limpiar ──
+const TARGET_TABLES: Record<string, string[]> = {
+  'products': ['products', 'stock'],
+  'movements': ['movements'],
+  'pending_sales': ['pending_sales'],
+  'purchases': ['purchase_orders', 'purchase_order_items'],
+  'locations': ['locations'],
+  'users': ['users'],
+  'settings': ['settings'],
+  'audit_logs': ['audit_logs'],
+  'factory_images': ['factory_images'],
+  'all': ['products','stock','movements','pending_sales','purchase_orders','purchase_order_items','factory_images','audit_logs','settings'],
+};
+
 router.post('/clean', requireRole('admin'), asyncHandler(async (req: Request, res: Response) => {
-  const { adminPassword, target } = req.body;
+  const { adminPassword, targets, target } = req.body;
   if (!adminPassword) { fail(res, 'Password de admin requerido'); return; }
   const username = req.user!.username;
   const user = await req.db!.query('SELECT password FROM users WHERE username = $1', [username]);
@@ -114,29 +128,40 @@ router.post('/clean', requireRole('admin'), asyncHandler(async (req: Request, re
     fail(res, 'Password de administrador incorrecto', 403); return;
   }
 
-  const t = target || 'all';
-  const errors: string[] = [];
+  // targets: array de strings (nuevo) o target: string (legado)
+  const list: string[] = Array.isArray(targets) ? targets : [target || 'all'];
   const pool = req.db!;
+  const errors: string[] = [];
+  const cleaned: string[] = [];
 
-  if (t === 'products' || t === 'all') {
-    for (const tbl of ['purchase_order_items','purchase_orders','pending_sales','movements','stock','products']) {
-      try { await pool.query(`TRUNCATE TABLE ${tbl} CASCADE`); }
+  // ── Backup automático antes de limpiar ──
+  const backupData: Record<string, any[]> = {};
+  for (const t of list) {
+    const tables = TARGET_TABLES[t];
+    if (!tables) continue;
+    for (const tbl of tables) {
+      try { backupData[tbl] = (await pool.query(`SELECT * FROM ${tbl}`)).rows; } catch {}
+    }
+  }
+
+  // ── Limpiar tablas ──
+  for (const t of list) {
+    const tables = TARGET_TABLES[t];
+    if (!tables) { errors.push(`Target desconocido: ${t}`); continue; }
+    for (const tbl of tables) {
+      try { await pool.query(`TRUNCATE TABLE ${tbl} CASCADE`); cleaned.push(tbl); }
       catch (err: any) { errors.push(`${tbl}: ${err.message}`); }
     }
   }
 
-  if (t === 'locations' || t === 'all') {
-    try { await pool.query("DELETE FROM locations WHERE id != 'BODCENT'"); }
-    catch (err: any) { errors.push(`locations: ${err.message}`); }
-  }
-
-  if (t === 'users' || t === 'all') {
-    try { await pool.query("DELETE FROM users WHERE role != 'admin'"); }
-    catch (err: any) { errors.push(`users: ${err.message}`); }
-  }
-
-  await logAudit('INFO', 'backup', `Limpieza tipo ${t}`);
-  ok(res, { message: `Limpieza completada (${t})`, warnings: errors.length > 0 ? errors : undefined });
+  await logAudit('INFO', 'backup', `Limpieza: ${list.join(', ')} — ${cleaned.length} tablas`);
+  ok(res, {
+    message: `Limpieza completada: ${cleaned.join(', ')}`,
+    targets: list,
+    cleaned,
+    backup: backupData,
+    warnings: errors.length > 0 ? errors : undefined,
+  });
 }));
 
 export default router;
