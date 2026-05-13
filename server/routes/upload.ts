@@ -24,11 +24,22 @@ function parseCSV(text: string): any[] {
   return Papa.parse(text, { header: true, skipEmptyLines: true, delimiter: ',' }).data as any[];
 }
 
-/** Convierte fecha chilena (dd-mm-aa) o ISO a ISO 8601 */
+/** Convierte fecha chilena (dd-mm-aa), ISO, o número serial de Excel a ISO 8601 */
 function parseTimestamp(raw: string | undefined): string {
   if (!raw) return new Date().toISOString();
   const s = String(raw).trim();
   if (!s) return new Date().toISOString();
+
+  // ── Número serial de Excel (días desde 1/1/1900) ──
+  // Los números seriales de Excel para fechas 2020-2100 están entre ~43831 y ~73050
+  if (/^\d{4,6}$/.test(s)) {
+    const serial = parseInt(s, 10);
+    if (serial >= 40000 && serial <= 80000) {
+      // Excel date: días desde 30/12/1899 (el epoch real de Excel)
+      const d = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+  }
 
   // Si ya es ISO (contiene T o Z, o empieza con 4 dígitos-año)
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s).toISOString();
@@ -40,14 +51,19 @@ function parseTimestamp(raw: string | undefined): string {
     const month = parseInt(m[2], 10) - 1; // JS: 0-indexed
     let year = parseInt(m[3], 10);
     if (year < 100) year += 2000; // aa → aaaa
-    const d = new Date(year, month, day);
-    if (!isNaN(d.getTime())) return d.toISOString();
+    if (year >= 2000 && year <= 2100) {
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
   }
 
-  // Último intento: parse nativo
+  // Último intento: parse nativo, con validación de año razonable
   const d = new Date(s);
-  if (!isNaN(d.getTime())) return d.toISOString();
+  if (!isNaN(d.getTime()) && d.getFullYear() >= 2000 && d.getFullYear() <= 2100) {
+    return d.toISOString();
+  }
 
+  // Fallback: ahora
   return new Date().toISOString();
 }
 
