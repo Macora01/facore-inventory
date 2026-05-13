@@ -75,7 +75,7 @@ router.get(
       WHERE ${whereClause}
       GROUP BY period
       ORDER BY period DESC
-      LIMIT 90
+      LIMIT 365
     `, params);
 
     const summary = result.rows.map((r: any) => ({
