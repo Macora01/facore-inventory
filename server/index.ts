@@ -275,6 +275,45 @@ async function startServer() {
     ok(res, { deducted: r.rowCount, products: r.rows });
   }));
 
+  // ── POST /api/emergency/dedup-init-load — elimina INITIAL_LOAD duplicados ──
+  app.post('/api/emergency/dedup-init-load', asyncHandler(async (req: Request, res: Response) => {
+    const p = getPool();
+    if (!p) return fail(res, 'DB no disponible', 503);
+    const { productId } = req.body;
+    if (!productId) return fail(res, 'Falta productId');
+
+    // Buscar INITIAL_LOADs de este producto, ordenados del más antiguo al más reciente
+    const dups = await p.query(
+      `SELECT id, quantity, timestamp FROM movements
+       WHERE product_id = $1 AND type = 'INITIAL_LOAD'
+       ORDER BY timestamp ASC`,
+      [productId]
+    );
+
+    if (dups.rows.length <= 1) {
+      return ok(res, { message: `Producto ${productId} tiene ${dups.rows.length} INITIAL_LOAD(s). Nada que deduplicar.`, kept: dups.rows });
+    }
+
+    // Conservar el más antiguo, borrar los demás
+    const [keep, ...remove] = dups.rows;
+    const idsToDelete = remove.map((r: any) => r.id);
+    const qtyRemoved = remove.reduce((sum: number, r: any) => sum + Number(r.quantity), 0);
+
+    const delResult = await p.query(
+      `DELETE FROM movements WHERE id = ANY($1::text[]) AND type = 'INITIAL_LOAD'`,
+      [idsToDelete]
+    );
+
+    ok(res, {
+      productId,
+      kept: keep,
+      removed: remove,
+      totalRemoved: qtyRemoved,
+      deleted: delResult.rowCount,
+      message: `Se eliminaron ${delResult.rowCount} INITIAL_LOAD duplicados (${qtyRemoved} unds). Conservado: ${keep.id}`
+    });
+  }));
+
   // ── POST /api/emergency/deduct-all-sales ──
   app.post('/api/emergency/deduct-all-sales', asyncHandler(async (req: Request, res: Response) => {
     const p = getPool();
