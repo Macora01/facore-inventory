@@ -42,16 +42,19 @@ router.get(
 
     // ── 3. Totales ──
     // totalPurchased: INITIAL_LOAD + PURCHASE (entradas externas, no transferencias)
+    // totalAdjustments: ADJUSTMENT_IN - ADJUSTMENT_OUT (neto)
     const totalsResult = await pool.query(
       `SELECT
          COALESCE(SUM(CASE WHEN type IN ('INITIAL_LOAD', 'PURCHASE') THEN quantity ELSE 0 END), 0) as "totalPurchased",
-         COALESCE(SUM(CASE WHEN type = 'SALE' THEN quantity ELSE 0 END), 0) as "totalSold"
+         COALESCE(SUM(CASE WHEN type = 'SALE' THEN quantity ELSE 0 END), 0) as "totalSold",
+         COALESCE(SUM(CASE WHEN type = 'ADJUSTMENT_IN' THEN quantity ELSE 0 END), 0)
+         - COALESCE(SUM(CASE WHEN type = 'ADJUSTMENT_OUT' THEN quantity ELSE 0 END), 0) as "totalAdjustments"
        FROM movements
        WHERE product_id = $1`,
       [idVenta]
     );
 
-    const { totalPurchased, totalSold } = totalsResult.rows[0];
+    const { totalPurchased, totalSold, totalAdjustments } = totalsResult.rows[0];
 
     // ── 4. Stock por ubicación ──
     const stockResult = await pool.query(
@@ -115,6 +118,7 @@ router.get(
       totalPurchased: Number(totalPurchased),
       totalInStock: Number(totalInStock),
       totalSold: Number(totalSold),
+      totalAdjustments: Number(totalAdjustments),
       stockByLocation,
       salesByLocation,
       history: history.map((m: any) => ({

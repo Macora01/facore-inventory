@@ -61,8 +61,9 @@ export enum MovementType {
   TRANSFER_IN = 'TRANSFER_IN',
   TRANSFER_OUT = 'TRANSFER_OUT',
   SALE = 'SALE',
-  ADJUSTMENT = 'ADJUSTMENT',
-  REVERSION = 'REVERSION',
+  PURCHASE = 'PURCHASE',
+  ADJUSTMENT_OUT = 'ADJUSTMENT_OUT',
+  ADJUSTMENT_IN = 'ADJUSTMENT_IN',
 }
 
 export const MOVEMENT_TYPE_LABEL: Record<MovementType, string> = {
@@ -70,8 +71,9 @@ export const MOVEMENT_TYPE_LABEL: Record<MovementType, string> = {
   [MovementType.TRANSFER_IN]: 'Entrada',
   [MovementType.TRANSFER_OUT]: 'Salida',
   [MovementType.SALE]: 'Venta',
-  [MovementType.ADJUSTMENT]: 'Ajuste',
-  [MovementType.REVERSION]: 'Reversión',
+  [MovementType.PURCHASE]: 'Compra',
+  [MovementType.ADJUSTMENT_OUT]: 'Ajuste - Baja',
+  [MovementType.ADJUSTMENT_IN]: 'Ajuste - Alta',
 };
 
 export interface Movement {
@@ -181,6 +183,7 @@ export interface TraceabilitySummary {
   totalPurchased: number;
   totalInStock: number;
   totalSold: number;
+  totalAdjustments: number;
   stockByLocation: { locationId: string; locationName: string; quantity: number }[];
   salesByLocation: { locationId: string; locationName: string; quantity: number; percentage: number }[];
   history: Movement[];

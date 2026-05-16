@@ -25,6 +25,7 @@ import aiRoutes from './routes/ai.js';
 import uploadRoutes from './routes/upload.js';
 import settingsRoutes from './routes/settings.js';
 import seedRoutes from './routes/seed.js';
+import adjustmentsRoutes from './routes/adjustments.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,6 +85,7 @@ async function startServer() {
   app.use('/api/upload', authenticateToken, uploadRoutes);
   app.use('/api/settings', authenticateToken, settingsRoutes);
   app.use('/api/seed', authenticateToken, seedRoutes);
+  app.use('/api/adjustments', adjustmentsRoutes);
 
   // ── POST /api/emergency/init-db — recrear DB desde cero ──
   app.post('/api/emergency/init-db', asyncHandler(async (req: Request, res: Response) => {

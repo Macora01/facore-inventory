@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import { Search, AlertTriangle, Download, Plus, Trash2, Save } from 'lucide-react';
+import { Search, AlertTriangle, Download, Plus, Trash2, Save, Wrench } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 
 const InventoryPage: React.FC = () => {
@@ -26,6 +26,16 @@ const InventoryPage: React.FC = () => {
     initial_stock: '',
   });
   const [saving, setSaving] = useState(false);
+
+  // ── Ajuste manual ──
+  const [showAdjust, setShowAdjust] = useState(false);
+  const [adjustProductId, setAdjustProductId] = useState('');
+  const [adjustProductDesc, setAdjustProductDesc] = useState('');
+  const [adjustLocationId, setAdjustLocationId] = useState('');
+  const [adjustType, setAdjustType] = useState<'ADJUSTMENT_OUT' | 'ADJUSTMENT_IN'>('ADJUSTMENT_OUT');
+  const [adjustQuantity, setAdjustQuantity] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
+  const [adjustSaving, setAdjustSaving] = useState(false);
 
   useEffect(() => {
     fetchData('products');
@@ -194,6 +204,50 @@ const InventoryPage: React.FC = () => {
       if (selectedProduct === id) setSelectedProduct(null);
     } catch (err: any) {
       addToast(err.message || 'Error al eliminar', 'error');
+    }
+  };
+
+  // ── Ajuste ──
+  const openAdjust = (p: typeof products[0]) => {
+    setAdjustProductId(p.id_venta);
+    setAdjustProductDesc(p.description);
+    setAdjustLocationId('BODCENT');
+    setAdjustType('ADJUSTMENT_OUT');
+    setAdjustQuantity('');
+    setAdjustReason('');
+    setShowAdjust(true);
+  };
+
+  const handleAdjustSubmit = async () => {
+    const qty = Number(adjustQuantity);
+    if (!qty || qty <= 0) { addToast('Cantidad debe ser un número positivo', 'error'); return; }
+    if (!adjustReason.trim()) { addToast('El motivo es obligatorio', 'error'); return; }
+
+    setAdjustSaving(true);
+    try {
+      const res = await fetch('/api/adjustments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          productId: adjustProductId,
+          locationId: adjustLocationId,
+          quantity: qty,
+          type: adjustType,
+          reason: adjustReason.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Error al guardar ajuste');
+      }
+      addToast('Ajuste registrado', 'success');
+      setShowAdjust(false);
+      fetchData('stock');
+    } catch (err: any) {
+      addToast(err.message || 'Error al guardar ajuste', 'error');
+    } finally {
+      setAdjustSaving(false);
     }
   };
 
@@ -384,6 +438,13 @@ const InventoryPage: React.FC = () => {
                       <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                         <button
                           className="p-1 rounded text-text-muted hover:text-clay hover:bg-surface transition-colors"
+                          title="Ajustar stock"
+                          onClick={() => openAdjust(p)}
+                        >
+                          <Wrench size={14} />
+                        </button>
+                        <button
+                          className="p-1 rounded text-text-muted hover:text-clay hover:bg-surface transition-colors"
                           title="Editar"
                           onClick={() => openEdit(p)}
                         >
@@ -410,6 +471,72 @@ const InventoryPage: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Modal de ajuste */}
+      {showAdjust && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowAdjust(false)} />
+          <Card title={`Ajustar stock — ${adjustProductId}`} className="relative z-10 w-full max-w-md mx-4">
+            <p className="text-sm text-text-secondary mb-4">{adjustProductDesc}</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Tipo</label>
+                <select value={adjustType} onChange={e => setAdjustType(e.target.value as any)}>
+                  <option value="ADJUSTMENT_OUT">Baja (pérdida, estropeo)</option>
+                  <option value="ADJUSTMENT_IN">Alta (recuperación, devolución)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Ubicación</label>
+                <select value={adjustLocationId} onChange={e => setAdjustLocationId(e.target.value)}>
+                  {locations.filter(l => l.isActive !== false).map(l => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">Cantidad</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={adjustQuantity}
+                  onChange={e => setAdjustQuantity(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted uppercase tracking-wider mb-1">
+                  Motivo <span className="text-brick">*</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={adjustReason}
+                  onChange={e => setAdjustReason(e.target.value)}
+                  placeholder="Ej: prenda estropeada en lavado, pérdida en traslado..."
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <Button
+                variant={adjustType === 'ADJUSTMENT_OUT' ? 'danger' : 'primary'}
+                size="md"
+                onClick={handleAdjustSubmit}
+                disabled={adjustSaving}
+              >
+                {adjustSaving ? 'Guardando...' : adjustType === 'ADJUSTMENT_OUT' ? 'Registrar baja' : 'Registrar alta'}
+              </Button>
+              <Button variant="secondary" size="md" onClick={() => setShowAdjust(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Detalle de producto seleccionado */}
       {selected && (
