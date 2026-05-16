@@ -79,12 +79,12 @@ router.get(
 
     // ── 5. Ventas por ubicación con porcentaje ──
     const salesResult = await pool.query(
-      `SELECT m.to_location_id as "locationId", l.name as "locationName",
+      `SELECT m.from_location_id as "locationId", l.name as "locationName",
               SUM(m.quantity) as quantity
        FROM movements m
-       JOIN locations l ON m.to_location_id = l.id
+       JOIN locations l ON m.from_location_id = l.id
        WHERE m.product_id = $1 AND m.type = 'SALE'
-       GROUP BY m.to_location_id, l.name
+       GROUP BY m.from_location_id, l.name
        ORDER BY quantity DESC`,
       [idVenta]
     );
